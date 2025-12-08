@@ -35,7 +35,8 @@ class EntregaSerializer(serializers.ModelSerializer):
     
     def validate_trabajador(self, value):
         """Validar que el trabajador esté activo"""
-        if not value.is_active:
+        # CORREGIDO: activo en lugar de is_active
+        if not value.activo:
             raise serializers.ValidationError(
                 'El trabajador no está activo en el sistema'
             )
@@ -67,10 +68,14 @@ class EntregaSerializer(serializers.ModelSerializer):
         if not trabajador or not caja:
             return data
         
-        # Validar compatibilidad de sucursal
-        if trabajador.sucursal != caja.sucursal:
+        # CORREGIDO: Obtener sede del trabajador (compatible con sede o sucursal)
+        trabajador_sede = getattr(trabajador, 'sede', None) or getattr(trabajador, 'sucursal', None)
+        caja_sucursal = caja.sucursal
+        
+        # Validar compatibilidad de sucursal/sede
+        if trabajador_sede and caja_sucursal and trabajador_sede != caja_sucursal:
             raise serializers.ValidationError({
-                'caja': f'Incompatibilidad de sucursal: Trabajador en {trabajador.get_sucursal_display()}, '
+                'caja': f'Incompatibilidad de ubicación: Trabajador en otra sede, '
                        f'Caja en {caja.get_sucursal_display()}'
             })
         
@@ -78,17 +83,18 @@ class EntregaSerializer(serializers.ModelSerializer):
         tipo_trabajador = trabajador.tipo_contrato
         tipo_caja = caja.tipo_contrato
         
-        # Matriz de compatibilidad
-        compatibilidad = {
-            'plazo': 'plazo_fijo',
-            'indefinido': 'indefinido'
-        }
-        
-        if compatibilidad.get(tipo_trabajador) != tipo_caja:
+        # CORREGIDO: Matriz de compatibilidad actualizada
+        if tipo_trabajador == 'plazo_fijo' and tipo_caja != 'plazo_fijo':
             raise serializers.ValidationError({
                 'caja': f'Incompatibilidad de tipo de contrato: '
-                       f'Trabajador tiene contrato {trabajador.get_tipo_contrato_display()}, '
-                       f'pero la caja es para {caja.get_tipo_contrato_display()}'
+                       f'Trabajador tiene contrato a plazo fijo, '
+                       f'pero la caja es para contratos indefinidos'
+            })
+        elif tipo_trabajador == 'indefinido' and tipo_caja != 'indefinido':
+            raise serializers.ValidationError({
+                'caja': f'Incompatibilidad de tipo de contrato: '
+                       f'Trabajador tiene contrato indefinido, '
+                       f'pero la caja es para contratos a plazo fijo'
             })
         
         return data
@@ -97,9 +103,11 @@ class EntregaSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """
         Crear entrega y descontar automáticamente del inventario.
+        También actualiza el estado del trabajador a 'retirado'.
         Usa transacción atómica para garantizar consistencia.
         """
         caja = validated_data.get('caja')
+        trabajador = validated_data.get('trabajador')
         
         # Crear la entrega
         entrega = Entrega.objects.create(**validated_data)
@@ -107,6 +115,10 @@ class EntregaSerializer(serializers.ModelSerializer):
         # Descontar del inventario de manera atómica
         caja.cantidad_disponible -= 1
         caja.save(update_fields=['cantidad_disponible'])
+        
+        # Actualizar estado del trabajador a 'retirado'
+        trabajador.estado = 'retirado'
+        trabajador.save(update_fields=['estado'])
         
         return entrega
 
@@ -213,22 +225,22 @@ class EntregaCreateSerializer(serializers.Serializer):
         Buscar trabajador y caja según los datos proporcionados,
         validar compatibilidad y crear la entrega.
         """
-        # Buscar trabajador
+        # Buscar trabajador (CORREGIDO: activo en lugar de is_active)
         trabajador = None
         if validated_data.get('trabajador_id'):
             trabajador = Trabajador.objects.get(
                 id=validated_data['trabajador_id'],
-                is_active=True
+                activo=True
             )
         elif validated_data.get('trabajador_rut'):
             trabajador = Trabajador.objects.get(
                 rut=validated_data['trabajador_rut'],
-                is_active=True
+                activo=True
             )
         elif validated_data.get('trabajador_qr'):
             trabajador = Trabajador.objects.get(
                 rut=validated_data['trabajador_qr'],
-                is_active=True
+                activo=True
             )
         
         # Buscar caja
@@ -253,6 +265,7 @@ class EntregaCreateSerializer(serializers.Serializer):
         entrega_data = {
             'trabajador': trabajador.id,
             'caja': caja.id,
+            'guardia': self.context['request'].user.id,
             'observaciones': validated_data.get('observaciones', ''),
             'codigo_qr_trabajador': validated_data.get('trabajador_qr', ''),
             'codigo_qr_caja': validated_data.get('caja_qr', '')

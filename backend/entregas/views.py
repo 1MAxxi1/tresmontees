@@ -3,7 +3,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Avg
+from django.db import models
+from django.db.models import Q, Count, Avg, Sum
 from django.utils import timezone
 from datetime import timedelta, datetime
 from .models import Entrega
@@ -107,20 +108,25 @@ class EntregaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def estadisticas_guardia(self, request):
         """
-        Estadísticas del guardia actual.
+        Estadísticas completas del guardia actual.
         
         GET /api/entregas/estadisticas_guardia/
         
         Retorna:
         - Entregas de hoy
         - Entregas de la semana
-        - Entregas del mes
-        - Promedio diario
+        - Stock disponible
+        - Incidencias pendientes
+        - Últimas entregas
+        - Última actividad
         """
+        from cajas.models import Caja
+        from incidencias.models import Incidencia
+        
         hoy = timezone.now().date()
         inicio_semana = hoy - timedelta(days=hoy.weekday())
-        inicio_mes = hoy.replace(day=1)
         
+        # Entregas del guardia
         entregas_hoy = self.queryset.filter(
             guardia=request.user,
             fecha_entrega__date=hoy
@@ -131,35 +137,92 @@ class EntregaViewSet(viewsets.ModelViewSet):
             fecha_entrega__date__gte=inicio_semana
         ).count()
         
-        entregas_mes = self.queryset.filter(
+        # Última entrega
+        ultima_entrega = self.queryset.filter(
+            guardia=request.user
+        ).order_by('-fecha_entrega').first()
+        
+        ultima_entrega_info = None
+        if ultima_entrega:
+            ultima_entrega_info = {
+                'trabajador': ultima_entrega.trabajador.nombre_completo,
+                'fecha': ultima_entrega.fecha_entrega,
+                'hace': self._tiempo_transcurrido(ultima_entrega.fecha_entrega)
+            }
+        
+        # Stock disponible (total)
+        stock_total = Caja.objects.filter(activa=True).aggregate(
+            total=models.Sum('cantidad_disponible')
+        )['total'] or 0
+        
+        # Stock por sucursal
+        stock_por_sucursal = []
+        for sucursal_code, sucursal_nombre in Caja.SUCURSAL_CHOICES:
+            stock = Caja.objects.filter(
+                sucursal=sucursal_code,
+                activa=True
+            ).aggregate(total=models.Sum('cantidad_disponible'))['total'] or 0
+            
+            stock_por_sucursal.append({
+                'sucursal': sucursal_nombre,
+                'stock': stock
+            })
+        
+        # Incidencias pendientes del guardia
+        incidencias_pendientes = Incidencia.objects.filter(
             guardia=request.user,
-            fecha_entrega__month=hoy.month,
-            fecha_entrega__year=hoy.year
+            estado='pendiente'
         ).count()
         
-        # Calcular promedio diario del mes
-        dias_transcurridos = hoy.day
-        promedio_diario = entregas_mes / dias_transcurridos if dias_transcurridos > 0 else 0
-        
-        # Estadísticas por estado
-        por_estado = self.queryset.filter(
+        # Últimas 5 entregas
+        ultimas_entregas = self.queryset.filter(
             guardia=request.user,
-            fecha_entrega__month=hoy.month,
-            fecha_entrega__year=hoy.year
-        ).values('estado').annotate(
-            total=Count('id')
-        )
+            fecha_entrega__date=hoy
+        ).order_by('-fecha_entrega')[:5]
+        
+        entregas_recientes = []
+        for entrega in ultimas_entregas:
+            entregas_recientes.append({
+                'id': entrega.id,
+                'trabajador': entrega.trabajador.nombre_completo,
+                'trabajador_rut': entrega.trabajador.rut,
+                'caja': entrega.caja.codigo,
+                'hora': entrega.fecha_entrega.strftime('%H:%M'),
+                'hace': self._tiempo_transcurrido(entrega.fecha_entrega)
+            })
         
         stats = {
             'entregas_hoy': entregas_hoy,
             'entregas_semana': entregas_semana,
-            'entregas_mes': entregas_mes,
-            'promedio_diario': round(promedio_diario, 2),
-            'por_estado': list(por_estado),
-            'fecha_consulta': hoy
+            'stock_total': stock_total,
+            'stock_por_sucursal': stock_por_sucursal,
+            'incidencias_pendientes': incidencias_pendientes,
+            'ultima_entrega': ultima_entrega_info,
+            'entregas_recientes': entregas_recientes,
+            'fecha_actual': hoy,
+            'hora_actual': timezone.now().strftime('%H:%M')
         }
         
         return Response(stats)
+    
+    def _tiempo_transcurrido(self, fecha):
+        """Calcula el tiempo transcurrido en formato legible"""
+        ahora = timezone.now()
+        diferencia = ahora - fecha
+        
+        segundos = diferencia.total_seconds()
+        
+        if segundos < 60:
+            return "hace unos segundos"
+        elif segundos < 3600:
+            minutos = int(segundos / 60)
+            return f"hace {minutos} min" if minutos > 1 else "hace 1 min"
+        elif segundos < 86400:
+            horas = int(segundos / 3600)
+            return f"hace {horas}h" if horas > 1 else "hace 1h"
+        else:
+            dias = int(segundos / 86400)
+            return f"hace {dias} días" if dias > 1 else "hace 1 día"
     
     @action(detail=False, methods=['post'])
     def validar_trabajador(self, request):
@@ -174,8 +237,7 @@ class EntregaViewSet(viewsets.ModelViewSet):
         Retorna:
         - Información completa del trabajador
         - Última entrega recibida
-        - Sucursal
-        - Tipo de contrato
+        - Validación si ya retiró caja
         """
         rut = request.data.get('rut')
         qr_code = request.data.get('qr_code')
@@ -193,7 +255,40 @@ class EntregaViewSet(viewsets.ModelViewSet):
             else:
                 trabajador = Trabajador.objects.get(rut=rut, activo=True)
             
-            # Obtener última entrega
+            # VALIDACIÓN: Verificar si ya retiró su caja
+            if trabajador.estado == 'retirado':
+                return Response(
+                    {
+                        'error': 'Este trabajador ya retiró su caja',
+                        'trabajador': {
+                            'nombre': trabajador.nombre_completo,
+                            'rut': trabajador.rut,
+                            'estado': 'retirado'
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verificar si tiene entregas activas
+            entregas_activas = Entrega.objects.filter(
+                trabajador=trabajador,
+                estado__in=['entregado', 'pendiente']
+            ).count()
+            
+            if entregas_activas > 0:
+                return Response(
+                    {
+                        'error': 'Este trabajador ya tiene una entrega registrada',
+                        'trabajador': {
+                            'nombre': trabajador.nombre_completo,
+                            'rut': trabajador.rut,
+                            'entregas_activas': entregas_activas
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Obtener última entrega (histórico)
             ultima_entrega = Entrega.objects.filter(
                 trabajador=trabajador
             ).order_by('-fecha_entrega').first()
@@ -201,6 +296,7 @@ class EntregaViewSet(viewsets.ModelViewSet):
             # Serializar datos
             trabajador_data = TrabajadorSerializer(trabajador).data
             trabajador_data['ultima_entrega'] = None
+            trabajador_data['puede_recibir_caja'] = True
             
             if ultima_entrega:
                 trabajador_data['ultima_entrega'] = {
@@ -245,7 +341,7 @@ class EntregaViewSet(viewsets.ModelViewSet):
             )
         
         try:
-            # Buscar caja
+            # Buscar caja (CORREGIDO: activa en lugar de activo)
             if qr_code:
                 caja = Caja.objects.get(codigo=qr_code, activa=True)
             else:

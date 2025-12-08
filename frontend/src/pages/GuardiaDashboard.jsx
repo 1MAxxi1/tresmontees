@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   QrCode, User, Package, CheckCircle, AlertTriangle, 
-  LogOut, ArrowLeft, Camera, X
+  LogOut, ArrowLeft, Camera, X, TrendingUp, Clock, Box
 } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import api from '../api/axios';
+import IncidenciasGuardia from '../components/IncidenciasGuardia';
 import '../mobile-styles.css';
 
 export default function GuardiaDashboard() {
@@ -20,33 +21,46 @@ export default function GuardiaDashboard() {
   const [codigoInput, setCodigoInput] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   
+  // Estadísticas
+  const [stats, setStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  
   // Estados para QR Scanner
   const [scanningType, setScanningType] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
   const scannerRef = useRef(null);
   
   // Estados para incidencias
-  const [rutTrabajadorIncidencia, setRutTrabajadorIncidencia] = useState('');
-  const [descripcionIncidencia, setDescripcionIncidencia] = useState('');
+  const [showIncidencias, setShowIncidencias] = useState(false);
 
   useEffect(() => {
     const userData = localStorage.getItem('user');
     if (userData) {
       setUser(JSON.parse(userData));
     }
+    cargarEstadisticas();
   }, []);
 
   useEffect(() => {
     if (showScanner && !scannerRef.current) {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { 
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
-        },
-        false
-      );
+      // Detectar si es móvil o computador
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      const config = { 
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true,
+      };
+      
+      // Solo en móviles, intentar usar cámara trasera
+      if (isMobile) {
+        config.videoConstraints = {
+          facingMode: { ideal: "environment" }
+        };
+      }
+      
+      const scanner = new Html5QrcodeScanner("qr-reader", config, false);
 
       scanner.render(onScanSuccess, onScanError);
       scannerRef.current = scanner;
@@ -60,6 +74,18 @@ export default function GuardiaDashboard() {
     };
   }, [showScanner]);
 
+  const cargarEstadisticas = async () => {
+    try {
+      setLoadingStats(true);
+      const response = await api.get('/entregas/estadisticas_guardia/');
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     toast.success('Sesión cerrada');
@@ -69,7 +95,6 @@ export default function GuardiaDashboard() {
   const onScanSuccess = async (decodedText) => {
     console.log('QR escaneado:', decodedText);
     
-    // Detener el escáner
     if (scannerRef.current) {
       scannerRef.current.clear().catch(err => console.error(err));
       scannerRef.current = null;
@@ -87,7 +112,6 @@ export default function GuardiaDashboard() {
   };
 
   const onScanError = (error) => {
-    // No mostrar errores de lectura, son normales
     console.debug('Error de lectura:', error);
   };
 
@@ -103,6 +127,23 @@ export default function GuardiaDashboard() {
     }
     setShowScanner(false);
     setScanningType(null);
+  };
+
+  // Función para formatear tipo de contrato
+  const formatTipoContrato = (tipo) => {
+    if (tipo === 'indefinido') return 'Indefinido';
+    if (tipo === 'plazo_fijo') return 'Plazo Fijo';
+    return tipo || 'No especificado';
+  };
+
+  // Función para formatear sucursal
+  const formatSucursal = (sucursal) => {
+    const sucursales = {
+      'casablanca': 'Casablanca',
+      'valparaiso_bif': 'Valparaíso – Planta BIF',
+      'valparaiso_bic': 'Valparaíso – Planta BIC'
+    };
+    return sucursales[sucursal] || sucursal;
   };
 
   const validarTrabajadorConRut = async (rut) => {
@@ -143,7 +184,7 @@ export default function GuardiaDashboard() {
     try {
       const response = await api.post('/entregas/validar_caja/', {
         codigo: codigo.trim(),
-        sucursal: trabajador.sucursal
+        sucursal: trabajador.sede
       });
       setCaja(response.data);
       setStep('confirmar');
@@ -172,39 +213,13 @@ export default function GuardiaDashboard() {
       setStep('exito');
       toast.success('¡Entrega registrada con éxito!');
 
+      // Recargar estadísticas
       setTimeout(() => {
+        cargarEstadisticas();
         resetFlow();
       }, 2500);
     } catch (error) {
       toast.error(error.response?.data?.error || 'Error creando entrega');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const registrarIncidencia = async (e) => {
-    e.preventDefault();
-    
-    if (!descripcionIncidencia.trim()) {
-      toast.error('Debes describir el problema');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await api.post('/incidencias/crear_incidencia/', {
-        rut_trabajador: rutTrabajadorIncidencia.trim() || null,
-        descripcion: descripcionIncidencia.trim()
-      });
-
-      setStep('incidencia-exitosa');
-      toast.success('¡Incidencia registrada!');
-      
-      setTimeout(() => {
-        resetFlow();
-      }, 2500);
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Error registrando incidencia');
     } finally {
       setLoading(false);
     }
@@ -217,8 +232,6 @@ export default function GuardiaDashboard() {
     setRutInput('');
     setCodigoInput('');
     setShowManualInput(false);
-    setRutTrabajadorIncidencia('');
-    setDescripcionIncidencia('');
     if (scannerRef.current) {
       scannerRef.current.clear().catch(err => console.error(err));
       scannerRef.current = null;
@@ -281,7 +294,6 @@ export default function GuardiaDashboard() {
             {scanningType === 'trabajador' ? 'Escanear QR del Trabajador' : 'Escanear QR de la Caja'}
           </h2>
 
-          {/* Contenedor del escáner */}
           <div id="qr-reader" style={{ width: '100%', maxWidth: '500px' }}></div>
 
           <p style={{
@@ -343,9 +355,10 @@ export default function GuardiaDashboard() {
       {/* Contenido */}
       <div className="dashboard-content">
         
-        {/* PANTALLA INICIAL */}
+        {/* PANTALLA INICIAL CON ESTADÍSTICAS */}
         {step === 'inicio' && (
           <>
+            {/* Botones de Acción PRIMERO */}
             <button onClick={() => setStep('escanear')} className="action-card">
               <div className="action-icon green">
                 <QrCode />
@@ -355,7 +368,7 @@ export default function GuardiaDashboard() {
             </button>
 
             <button 
-              onClick={() => setStep('incidencia')} 
+              onClick={() => setShowIncidencias(true)}
               className="action-card"
             >
               <div className="action-icon orange">
@@ -364,6 +377,151 @@ export default function GuardiaDashboard() {
               <h3 className="action-title">Registrar Incidencia</h3>
               <p className="action-subtitle">Reportar un problema o novedad</p>
             </button>
+
+            {/* Panel de Estadísticas DESPUÉS */}
+            {!loadingStats && stats && (
+              <div style={{
+                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                borderRadius: '24px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 10px 30px rgba(37, 99, 235, 0.3)',
+                color: 'white'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem'
+                }}>
+                  <h2 style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 'bold',
+                    margin: 0
+                  }}>📊 Estadísticas de Hoy</h2>
+                  <span style={{
+                    fontSize: '0.875rem',
+                    opacity: 0.9
+                  }}>{stats.hora_actual}</span>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '1rem'
+                }}>
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    padding: '1rem',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>✅</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.entregas_hoy}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Entregas hoy</div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    padding: '1rem',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>📦</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.stock_total}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Stock disponible</div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    padding: '1rem',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>📈</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.entregas_semana}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Esta semana</div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    padding: '1rem',
+                    backdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>⚠️</div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: 'bold' }}>{stats.incidencias_pendientes}</div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.9 }}>Incidencias</div>
+                  </div>
+                </div>
+
+                {stats.ultima_entrega && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '0.75rem',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    fontSize: '0.875rem'
+                  }}>
+                    <div style={{ opacity: 0.8, marginBottom: '0.25rem' }}>⏱️ Último registro:</div>
+                    <div style={{ fontWeight: '600' }}>
+                      {stats.ultima_entrega.trabajador} - {stats.ultima_entrega.hace}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Últimas Entregas */}
+            {!loadingStats && stats && stats.entregas_recientes && stats.entregas_recientes.length > 0 && (
+              <div style={{
+                background: 'white',
+                borderRadius: '24px',
+                padding: '1.5rem',
+                marginBottom: '1.5rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)'
+              }}>
+                <h3 style={{
+                  fontSize: '1.125rem',
+                  fontWeight: 'bold',
+                  marginBottom: '1rem',
+                  color: '#1f2937'
+                }}>📜 Últimas Entregas</h3>
+
+                {stats.entregas_recientes.map((entrega, index) => (
+                  <div key={entrega.id} style={{
+                    padding: '0.75rem',
+                    background: '#f9fafb',
+                    borderRadius: '12px',
+                    marginBottom: index < stats.entregas_recientes.length - 1 ? '0.75rem' : 0,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{
+                        fontWeight: '600',
+                        color: '#1f2937',
+                        marginBottom: '0.25rem'
+                      }}>{entrega.trabajador}</div>
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#6b7280'
+                      }}>
+                        RUT: {entrega.trabajador_rut} • {entrega.caja}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#059669',
+                      fontWeight: '600'
+                    }}>
+                      {entrega.hora}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
 
@@ -448,121 +606,6 @@ export default function GuardiaDashboard() {
                 </div>
               </form>
             )}
-
-            <button
-              onClick={() => setStep('incidencia')}
-              className="btn-secondary"
-              style={{
-                background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
-                color: 'white',
-                marginTop: '1rem'
-              }}
-            >
-              ⚠️ Registrar Incidencia
-            </button>
-          </div>
-        )}
-
-        {/* PANTALLA REGISTRAR INCIDENCIA */}
-        {step === 'incidencia' && (
-          <div className="validation-card">
-            <div className="validation-header">
-              <div className="validation-icon orange" style={{background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'}}>
-                <AlertTriangle />
-              </div>
-              <h2 className="validation-title">Registrar Incidencia</h2>
-            </div>
-
-            <form onSubmit={registrarIncidencia}>
-              <div className="form-section">
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  color: '#374151'
-                }}>
-                  RUT del trabajador (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={rutTrabajadorIncidencia}
-                  onChange={(e) => setRutTrabajadorIncidencia(e.target.value)}
-                  placeholder="12345678-9"
-                  className="input-field"
-                  style={{
-                    padding: '1rem 1.25rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-
-              <div className="form-section">
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  color: '#374151'
-                }}>
-                  Describe el problema *
-                </label>
-                <textarea
-                  value={descripcionIncidencia}
-                  onChange={(e) => setDescripcionIncidencia(e.target.value)}
-                  placeholder="Describe detalladamente el problema o novedad..."
-                  required
-                  rows="6"
-                  style={{
-                    width: '100%',
-                    padding: '1rem 1.25rem',
-                    fontSize: '1rem',
-                    fontWeight: '500',
-                    background: '#f3f4f6',
-                    border: '3px solid #e5e7eb',
-                    borderRadius: '18px',
-                    outline: 'none',
-                    transition: 'all 0.3s ease',
-                    color: '#1f2937',
-                    fontFamily: 'inherit',
-                    resize: 'vertical',
-                    minHeight: '140px'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.background = 'white';
-                    e.target.style.borderColor = '#f97316';
-                    e.target.style.boxShadow = '0 0 0 4px rgba(249, 115, 22, 0.15)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.background = '#f3f4f6';
-                    e.target.style.borderColor = '#e5e7eb';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-              </div>
-
-              <div className="form-section">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary"
-                  style={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    boxShadow: '0 10px 30px rgba(16, 185, 129, 0.4)'
-                  }}
-                >
-                  {loading ? 'Guardando...' : '💾 Guardar'}
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={resetFlow}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
-            </form>
           </div>
         )}
 
@@ -575,16 +618,16 @@ export default function GuardiaDashboard() {
                 <span>Trabajador Validado</span>
               </div>
               <div className="info-row">
-                <strong>Nombre:</strong> {trabajador.nombre} {trabajador.apellido}
+                <strong>Nombre:</strong> {trabajador.nombre_completo || `${trabajador.nombre} ${trabajador.apellido_paterno}`}
               </div>
               <div className="info-row">
                 <strong>RUT:</strong> {trabajador.rut}
               </div>
               <div className="info-row">
-                <strong>Sucursal:</strong> {trabajador.sucursal}
+                <strong>Tipo Contrato:</strong> <span style={{fontWeight: 'bold', color: '#059669'}}>{formatTipoContrato(trabajador.tipo_contrato)}</span>
               </div>
               <div className="info-row">
-                <strong>Tipo Contrato:</strong> {trabajador.tipo_contrato}
+                <strong>Sede:</strong> {formatSucursal(trabajador.sede || trabajador.sucursal)}
               </div>
             </div>
 
@@ -647,24 +690,78 @@ export default function GuardiaDashboard() {
             
             <div className="info-card blue">
               <div className="info-card-header">
-                <span>Trabajador</span>
+                <span>👤 Trabajador</span>
               </div>
               <div className="info-row">
-                <strong>{trabajador.nombre} {trabajador.apellido}</strong>
+                <strong>{trabajador.nombre_completo || `${trabajador.nombre} ${trabajador.apellido_paterno}`}</strong>
               </div>
-              <div className="info-row">{trabajador.rut}</div>
-              <div className="info-row">{trabajador.sucursal}</div>
+              <div className="info-row">
+                <strong>RUT:</strong> {trabajador.rut}
+              </div>
+              <div className="info-row">
+                <strong>Tipo Contrato:</strong> <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  background: trabajador.tipo_contrato === 'indefinido' ? '#dcfce7' : '#fef3c7',
+                  color: trabajador.tipo_contrato === 'indefinido' ? '#166534' : '#92400e',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem'
+                }}>
+                  {formatTipoContrato(trabajador.tipo_contrato)}
+                </span>
+              </div>
+              <div className="info-row">
+                <strong>Sede:</strong> {formatSucursal(trabajador.sede || trabajador.sucursal)}
+              </div>
             </div>
 
             <div className="info-card purple">
               <div className="info-card-header">
-                <span>Caja</span>
+                <span>📦 Caja</span>
               </div>
               <div className="info-row">
-                <strong>{caja.codigo}</strong>
+                <strong>Código:</strong> {caja.codigo}
               </div>
-              <div className="info-row">Stock disponible: {caja.cantidad_disponible}</div>
+              <div className="info-row">
+                <strong>Tipo:</strong> <span style={{
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  background: caja.tipo_contrato === 'indefinido' ? '#dcfce7' : '#fef3c7',
+                  color: caja.tipo_contrato === 'indefinido' ? '#166534' : '#92400e',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem'
+                }}>
+                  {formatTipoContrato(caja.tipo_contrato)}
+                </span>
+              </div>
+              <div className="info-row">
+                <strong>Sede:</strong> {formatSucursal(caja.sucursal)}
+              </div>
+              <div className="info-row">
+                <strong>Stock disponible:</strong> {caja.cantidad_disponible}
+              </div>
             </div>
+
+            {/* Alerta si los tipos no coinciden */}
+            {trabajador.tipo_contrato !== caja.tipo_contrato && (
+              <div style={{
+                padding: '1rem',
+                background: '#fef2f2',
+                border: '2px solid #fca5a5',
+                borderRadius: '12px',
+                marginBottom: '1rem'
+              }}>
+                <p style={{
+                  color: '#991b1b',
+                  fontWeight: 'bold',
+                  fontSize: '0.95rem',
+                  textAlign: 'center'
+                }}>
+                  ⚠️ ADVERTENCIA: El tipo de contrato del trabajador ({formatTipoContrato(trabajador.tipo_contrato)}) 
+                  no coincide con el tipo de caja ({formatTipoContrato(caja.tipo_contrato)})
+                </p>
+              </div>
+            )}
 
             <div className="form-section">
               <button
@@ -705,20 +802,29 @@ export default function GuardiaDashboard() {
           </div>
         )}
 
-        {/* ÉXITO INCIDENCIA */}
-        {step === 'incidencia-exitosa' && (
-          <div className="validation-card">
-            <div className="success-screen">
-              <div className="success-icon-lg" style={{background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)'}}>
-                <CheckCircle />
-              </div>
-              <h2 className="success-title">¡Incidencia Registrada!</h2>
-              <p className="success-message">El reporte ha sido enviado correctamente</p>
-            </div>
-          </div>
-        )}
-
       </div>
+
+      {/* MODAL DE INCIDENCIAS */}
+      {showIncidencias && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: '#f3f4f6',
+          zIndex: 9999,
+          overflowY: 'auto'
+        }}>
+          <IncidenciasGuardia 
+            onBack={() => setShowIncidencias(false)}
+            onSuccess={() => {
+              cargarEstadisticas(); // Actualizar estadísticas
+              setShowIncidencias(false);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

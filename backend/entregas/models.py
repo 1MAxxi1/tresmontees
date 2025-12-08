@@ -105,21 +105,25 @@ class Entrega(models.Model):
         entre trabajador y caja.
         """
         if self.trabajador and self.caja:
-            # Validar sucursal
-            if self.trabajador.sucursal != self.caja.sucursal:
+            # Obtener sede/sucursal del trabajador (compatible con ambos nombres de campo)
+            trabajador_sede = getattr(self.trabajador, 'sede', None) or getattr(self.trabajador, 'sucursal', None)
+            caja_sucursal = self.caja.sucursal
+            
+            # Validar sucursal/sede
+            if trabajador_sede and caja_sucursal and trabajador_sede != caja_sucursal:
                 raise ValidationError({
                     'caja': f'La caja es de {self.caja.get_sucursal_display()}, '
-                           f'pero el trabajador es de {self.trabajador.get_sucursal_display()}'
+                           f'pero el trabajador es de otra ubicación'
                 })
             
             # Validar tipo de contrato
             tipo_trabajador = self.trabajador.tipo_contrato
             tipo_caja = self.caja.tipo_contrato
             
-            # Mapeo de compatibilidad de tipos
-            if tipo_trabajador == 'plazo' and tipo_caja != 'plazo_fijo':
+            # Validar compatibilidad de tipos (corregido: plazo_fijo)
+            if tipo_trabajador == 'plazo_fijo' and tipo_caja != 'plazo_fijo':
                 raise ValidationError({
-                    'caja': 'El trabajador tiene contrato a plazo pero la caja es para contratos indefinidos'
+                    'caja': 'El trabajador tiene contrato a plazo fijo pero la caja es para contratos indefinidos'
                 })
             elif tipo_trabajador == 'indefinido' and tipo_caja != 'indefinido':
                 raise ValidationError({
@@ -129,7 +133,7 @@ class Entrega(models.Model):
             # Validar stock disponible
             if self.caja.cantidad_disponible <= 0:
                 raise ValidationError({
-                    'caja': f'No hay stock disponible de esta caja en {self.caja.get_sucursal_display()}'
+                    'caja': f'No hay stock disponible de esta caja'
                 })
             
             # Validar que la caja esté activa
@@ -156,7 +160,14 @@ class Entrega(models.Model):
         self.save(update_fields=['validado_supervisor', 'supervisor', 'fecha_validacion'])
     
     def __str__(self):
-        return f"Entrega a {self.trabajador.nombre_completo()} - {self.fecha_entrega.strftime('%d/%m/%Y %H:%M')}"
+        # Obtener nombre completo del trabajador de forma compatible
+        trabajador_nombre = getattr(self.trabajador, 'nombre_completo', None)
+        if trabajador_nombre:
+            nombre = trabajador_nombre
+        else:
+            nombre = f"{self.trabajador.nombre} {getattr(self.trabajador, 'apellido_paterno', '')}"
+        
+        return f"Entrega a {nombre} - {self.fecha_entrega.strftime('%d/%m/%Y %H:%M')}"
     
     @property
     def tiempo_transcurrido(self):
