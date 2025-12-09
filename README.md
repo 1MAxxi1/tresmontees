@@ -1,8 +1,6 @@
-# 🎁 PROYECTO TRES MONTEES - VERSIÓN MEJORADA
+# 🎁 PROYECTO TRES MONTEES 
 
 ## 📦 ¿Qué incluye este proyecto?
-
-Este es tu proyecto original con **TODAS las mejoras aplicadas**:
 
 ✅ Backend Django completamente funcional con mejoras  
 ✅ Modelo de Entregas mejorado con validaciones  
