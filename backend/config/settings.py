@@ -43,6 +43,9 @@ INSTALLED_APPS = [
     'cajas',
     'entregas',
     'incidencias',
+
+    'reportes',          
+    'notificaciones',
 ]
 
 MIDDLEWARE = [

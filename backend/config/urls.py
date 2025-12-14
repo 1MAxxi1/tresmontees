@@ -10,6 +10,8 @@ urlpatterns = [
     path('api/cajas/', include('cajas.urls')),
     path('api/entregas/', include('entregas.urls')),
     path('api/incidencias/', include('incidencias.urls')),
+    path('api/reportes/', include('reportes.urls')),          
+    path('api/notificaciones/', include('notificaciones.urls')),
 ]
 
 if settings.DEBUG:

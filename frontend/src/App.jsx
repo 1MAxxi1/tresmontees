@@ -2,6 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import GuardiaDashboard from './pages/GuardiaDashboard';
+import RRHHLayout from './components/RRHHLayout';
+import RRHHDashboardMUI from './pages/RRHHDashboardMUI';
+import Trabajadores from './pages/Trabajadores';
+import Entregas from './pages/Entregas';
+import Reportes from './pages/Reportes';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const userStr = localStorage.getItem('user');
@@ -58,6 +63,21 @@ function App() {
             </ProtectedRoute>
           } 
         />
+        
+        {/* RRHH con Layout de Material-UI */}
+        <Route 
+          path="/rrhh" 
+          element={
+            <ProtectedRoute allowedRoles={['rrhh', 'admin']}>
+              <RRHHLayout />
+            </ProtectedRoute>
+          } 
+        >
+          <Route index element={<RRHHDashboardMUI />} />
+          <Route path="trabajadores" element={<Trabajadores />} />
+          <Route path="entregas" element={<Entregas />} />
+          <Route path="reportes" element={<Reportes />} />
+        </Route>
         
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />

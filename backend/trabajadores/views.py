@@ -9,7 +9,7 @@ class TrabajadorViewSet(viewsets.ModelViewSet):
     serializer_class = TrabajadorSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['sucursal', 'tipo_contrato', 'is_active', 'area']
-    search_fields = ['rut', 'nombre', 'apellido', 'email']
-    ordering_fields = ['apellido', 'nombre', 'fecha_ingreso']
-    ordering = ['apellido', 'nombre']
+    filterset_fields = ['sede', 'tipo_contrato', 'activo']  # ← CORREGIDO
+    search_fields = ['rut', 'nombre', 'apellido_paterno', 'apellido_materno']  # ← CORREGIDO
+    ordering_fields = ['apellido_paterno', 'nombre']  # ← CORREGIDO
+    ordering = ['apellido_paterno', 'nombre']  # ← CORREGIDO
