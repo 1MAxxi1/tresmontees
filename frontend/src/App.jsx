@@ -7,6 +7,12 @@ import RRHHDashboardMUI from './pages/RRHHDashboardMUI';
 import Trabajadores from './pages/Trabajadores';
 import Entregas from './pages/Entregas';
 import Reportes from './pages/Reportes';
+import QRManager from './pages/QRManager';
+import Notificaciones from './pages/Notificaciones';
+import Configuracion from './pages/Configuracion';
+import SupervisorLayout from './components/SupervisorLayout';
+import SupervisorDashboard from './pages/SupervisorDashboard';
+import SupervisorIncidencias from './pages/SupervisorIncidencias';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const userStr = localStorage.getItem('user');
@@ -75,8 +81,24 @@ function App() {
         >
           <Route index element={<RRHHDashboardMUI />} />
           <Route path="trabajadores" element={<Trabajadores />} />
+          <Route path="qr" element={<QRManager />} />
           <Route path="entregas" element={<Entregas />} />
+          <Route path="notificaciones" element={<Notificaciones />} />
           <Route path="reportes" element={<Reportes />} />
+          <Route path="configuracion" element={<Configuracion />} />
+        </Route>
+
+        {/* SUPERVISOR con Layout de Material-UI */}
+        <Route 
+          path="/supervisor" 
+          element={
+            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+              <SupervisorLayout />
+            </ProtectedRoute>
+          } 
+        >
+          <Route index element={<SupervisorDashboard />} />
+          <Route path="incidencias" element={<SupervisorIncidencias />} />
         </Route>
         
         <Route path="/" element={<Navigate to="/login" replace />} />

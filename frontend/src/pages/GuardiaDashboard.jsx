@@ -9,6 +9,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode';
 import api from '../api/axios';
 import IncidenciasGuardia from '../components/IncidenciasGuardia';
 import '../mobile-styles.css';
+import '../mobile-styles-verde.css';
 
 export default function GuardiaDashboard() {
   const navigate = useNavigate();

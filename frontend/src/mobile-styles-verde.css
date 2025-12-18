@@ -1,0 +1,18 @@
+/* 
+ * TEMA VERDE - SOLO FONDO
+ * Archivo: verde-minimo.css
+ * SOLO cambia el fondo de la app, nada más
+ */
+
+/* Fondo principal de la aplicación */
+.dashboard-container {
+  background: #0a1a0a !important;
+  min-height: 100vh !important;
+}
+
+/* Header verde */
+.mobile-header {
+  background: #09320f !important;
+}
+
+/* Mantener todo lo demás IGUAL */

@@ -17,17 +17,13 @@ import {
   Menu,
   MenuItem,
   Divider,
+  Badge,
 } from '@mui/material';
 
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  People as PeopleIcon,
-  QrCode as QrCodeIcon,
-  LocalShipping as ShippingIcon,
-  Notifications as NotificationsIcon,
-  Assessment as AssessmentIcon,
-  Settings as SettingsIcon,
+  Assignment as AssignmentIcon,
   Logout as LogoutIcon,
   ChevronLeft as ChevronLeftIcon,
 } from '@mui/icons-material';
@@ -35,16 +31,11 @@ import {
 const drawerWidth = 240;
 
 const menuItems = [
-  { text: 'Panel', icon: <DashboardIcon />, path: '/rrhh' },
-  { text: 'Trabajadores', icon: <PeopleIcon />, path: '/rrhh/trabajadores' },
-  { text: 'Gestión QR', icon: <QrCodeIcon />, path: '/rrhh/qr' },
-  { text: 'Entregas', icon: <ShippingIcon />, path: '/rrhh/entregas' },
-  { text: 'Notificaciones', icon: <NotificationsIcon />, path: '/rrhh/notificaciones' },
-  { text: 'Informes', icon: <AssessmentIcon />, path: '/rrhh/reportes' },
-  { text: 'Configuración', icon: <SettingsIcon />, path: '/rrhh/configuracion' },
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/supervisor' },
+  { text: 'Incidencias', icon: <AssignmentIcon />, path: '/supervisor/incidencias' },
 ];
 
-const RRHHLayout = () => {
+const SupervisorLayout = () => {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
@@ -80,13 +71,13 @@ const RRHHLayout = () => {
           </IconButton>
 
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            TRES MONTES • RRHH
+            TRES MONTES • SUPERVISOR
           </Typography>
 
           {/* PERFIL */}
           <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
             <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
-              {user.username?.charAt(0).toUpperCase() || 'R'}
+              {user.username?.charAt(0).toUpperCase() || 'S'}
             </Avatar>
           </IconButton>
 
@@ -157,7 +148,7 @@ const RRHHLayout = () => {
 
         {open && (
           <Box sx={{ p: 2, mt: 'auto', textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
-            <Typography variant="caption">Sistema RRHH v1.0</Typography>
+            <Typography variant="caption">Sistema Supervisor v1.0</Typography>
             <Typography variant="caption" display="block">© 2024 Tres Montes</Typography>
           </Box>
         )}
@@ -172,4 +163,4 @@ const RRHHLayout = () => {
   );
 };
 
-export default RRHHLayout;
+export default SupervisorLayout;

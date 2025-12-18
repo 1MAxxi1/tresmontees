@@ -46,6 +46,8 @@ INSTALLED_APPS = [
 
     'reportes',          
     'notificaciones',
+    'qr_system',
+    'supervisor',
 ]
 
 MIDDLEWARE = [
