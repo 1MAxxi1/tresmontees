@@ -72,7 +72,7 @@ class IncidenciasListView(APIView):
                 Q(trabajador__rut__icontains=busqueda) |
                 Q(trabajador__nombre__icontains=busqueda) |
                 Q(trabajador__apellido_paterno__icontains=busqueda) |
-                Q(comentario_resolucion__icontains=busqueda)
+                Q(solucion__icontains=busqueda)
             )
         
         serializer = IncidenciaSupervisorSerializer(incidencias, many=True)
@@ -88,19 +88,22 @@ class ActualizarIncidenciaView(APIView):
     
     def patch(self, request, pk):
         incidencia = get_object_or_404(Incidencia, pk=pk)
+        print("📥 DATOS RECIBIDOS:", request.data)
         
         serializer = ActualizarIncidenciaSerializer(data=request.data)
         
         if not serializer.is_valid():
+            print("❌ ERROR DE VALIDACIÓN:", serializer.errors)
             return Response(
                 serializer.errors, 
                 status=status.HTTP_400_BAD_REQUEST
-            )
+          )
+        print("✅ DATOS VALIDADOS:", serializer.validated_data)
         
         # Actualizar incidencia
         incidencia.estado = serializer.validated_data['estado']
-        incidencia.comentario_resolucion = serializer.validated_data['comentario_resolucion']
-        incidencia.fecha_actualizacion = timezone.now()
+        incidencia.solucion = serializer.validated_data['solucion']
+        incidencia.fecha_resolucion = timezone.now()
         incidencia.save()
         
         return Response({
@@ -123,8 +126,8 @@ class ReabrirIncidenciaView(APIView):
             )
         
         incidencia.estado = 'pendiente'
-        incidencia.comentario_resolucion = ''
-        incidencia.fecha_actualizacion = timezone.now()
+        incidencia.solucion = ''
+        incidencia.fecha_resolucion = None
         incidencia.save()
         
         return Response({

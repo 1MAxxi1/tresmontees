@@ -40,6 +40,38 @@ import {
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
+// Función helper para formatear fechas - Maneja microsegundos de Django
+const formatearFecha = (fecha) => {
+  if (!fecha) return 'N/A';
+  
+  try {
+    // Si la fecha viene como string con microsegundos, los removemos
+    let fechaLimpia = fecha;
+    if (typeof fecha === 'string') {
+      // Remover microsegundos: de .957005-03:00 a .957-03:00
+      fechaLimpia = fecha.replace(/(\.\d{3})\d+/, '$1');
+    }
+    
+    const date = new Date(fechaLimpia);
+    
+    if (isNaN(date.getTime())) {
+      console.error('Fecha inválida:', fecha);
+      return 'Fecha inválida';
+    }
+    
+    const dia = String(date.getDate()).padStart(2, '0');
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const anio = date.getFullYear();
+    const horas = String(date.getHours()).padStart(2, '0');
+    const minutos = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${dia}-${mes}-${anio} ${horas}:${minutos} hrs`;
+  } catch (error) {
+    console.error('Error formateando fecha:', error, fecha);
+    return 'Error';
+  }
+};
+
 const StatCard = ({ title, value, icon, color, subtitle, onClick }) => (
   <Card 
     elevation={2}
@@ -184,7 +216,7 @@ const SupervisorDashboard = () => {
     try {
       await api.patch(`/supervisor/incidencias/${incidenciaSeleccionada.id}/actualizar/`, {
         estado: accionPendiente,
-        comentario_resolucion: comentario
+        solucion: comentario
       });
 
       toast.success('Incidencia actualizada correctamente');
@@ -254,7 +286,7 @@ const SupervisorDashboard = () => {
       inc.tipo_nombre?.toLowerCase().includes(texto) ||
       inc.trabajador?.rut?.includes(texto) ||
       inc.trabajador?.nombre_completo?.toLowerCase().includes(texto) ||
-      inc.comentario_resolucion?.toLowerCase().includes(texto)
+      inc.solucion?.toLowerCase().includes(texto)
     );
   });
 
@@ -328,21 +360,30 @@ const SupervisorDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Filtros - CON DROPDOWN DE ESTADO */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010' }}>
-        <Grid container spacing={2} alignItems="center">
-          {/* FILTRO POR ESTADO - ESTO ES LO QUE FALTABA */}
+      {/* Filtros - Diseño profesional mejorado */}
+      <Paper sx={{ p: 4, mb: 4, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <Typography variant="h6" sx={{ color: 'white', mb: 3, fontWeight: 'bold', fontSize: '1.1rem' }}>
+          Filtros de Búsqueda
+        </Typography>
+        
+        <Grid container spacing={3}>
+          {/* FILTRO POR ESTADO */}
           <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small">
-              <InputLabel sx={{ color: 'white' }}>📊 Filtrar por estado:</InputLabel>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Estado de la incidencia
+            </Typography>
+            <FormControl fullWidth>
               <Select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
-                label="📊 Filtrar por estado:"
+                displayEmpty
                 sx={{
                   color: 'white',
-                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  '.MuiSvgIcon-root': { color: 'white' }
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                  '.MuiSvgIcon-root': { color: 'white' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4caf50' }
                 }}
                 MenuProps={{
                   PaperProps: {
@@ -365,64 +406,121 @@ const SupervisorDashboard = () => {
                 }}
               >
                 <MenuItem value="">Todas las incidencias</MenuItem>
-                <MenuItem value="pendiente">Solo pendientes</MenuItem>
-                <MenuItem value="aprobado">Solo aprobadas</MenuItem>
-                <MenuItem value="rechazado">Solo rechazadas</MenuItem>
+                <MenuItem value="pendiente">Pendientes</MenuItem>
+                <MenuItem value="aprobado">Aprobadas</MenuItem>
+                <MenuItem value="rechazado">Rechazadas</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
           {/* BÚSQUEDA POR TEXTO */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={5}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Buscar incidencia
+            </Typography>
             <TextField
               fullWidth
-              size="small"
-              placeholder="🔎 Buscar por caso, trabajador, RUT..."
+              placeholder="Ingrese RUT, nombre del trabajador o descripción..."
               value={busquedaTexto}
               onChange={(e) => setBusquedaTexto(e.target.value)}
               sx={{
-                input: { color: 'white' },
-                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' }
+                '& .MuiInputBase-root': {
+                  color: 'white',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                },
+                '& .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.2)' 
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.3)' 
+                },
+                '& .Mui-focused .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: '#4caf50' 
+                }
               }}
             />
           </Grid>
 
-          {/* BOTÓN APLICAR FILTROS */}
-          <Grid item xs={12} md={2}>
-            <Button
-              fullWidth
-              variant="contained"
-              onClick={aplicarFiltros}
-              startIcon={<FilterIcon />}
-              sx={{ 
-                bgcolor: '#2e7d32', 
-                '&:hover': { bgcolor: '#1b5e20' }
-              }}
-            >
-              Aplicar Filtros
-            </Button>
+          {/* BOTONES */}
+          <Grid item xs={12} md={3}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Acciones
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={aplicarFiltros}
+                sx={{ 
+                  bgcolor: '#2e7d32',
+                  height: '56px',
+                  fontWeight: 'bold',
+                  '&:hover': { bgcolor: '#1b5e20' }
+                }}
+              >
+                Aplicar
+              </Button>
+              {(filtroEstado || busquedaTexto) && (
+                <Button
+                  variant="outlined"
+                  onClick={limpiarFiltros}
+                  sx={{ 
+                    color: 'white',
+                    height: '56px',
+                    minWidth: '56px',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': { 
+                      borderColor: '#f44336',
+                      bgcolor: 'rgba(244, 67, 54, 0.1)',
+                      color: '#f44336'
+                    }
+                  }}
+                  title="Limpiar filtros"
+                >
+                  <ClearIcon />
+                </Button>
+              )}
+            </Box>
           </Grid>
         </Grid>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-            📊 Total: {incidenciasFiltradas.length} incidencias | Filtro: {getFiltroTexto()}
-          </Typography>
+        {/* INFORMACIÓN DE RESULTADOS */}
+        <Box sx={{ 
+          mt: 3, 
+          pt: 3, 
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: '500' }}>
+              Mostrando <strong style={{ color: '#4caf50' }}>{incidenciasFiltradas.length}</strong> de <strong>{incidencias.length}</strong> incidencias
+            </Typography>
+            {filtroEstado && (
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                Filtro aplicado: {getFiltroTexto()}
+              </Typography>
+            )}
+          </Box>
           
           {(filtroEstado || busquedaTexto) && (
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={limpiarFiltros}
-              startIcon={<ClearIcon />}
-              sx={{ 
-                color: 'white', 
-                borderColor: 'white',
-                '&:hover': { borderColor: '#4caf50', color: '#4caf50' }
+            <Chip
+              label="Filtros activos"
+              onDelete={limpiarFiltros}
+              deleteIcon={<ClearIcon sx={{ color: 'white !important' }} />}
+              sx={{
+                bgcolor: 'rgba(76, 175, 80, 0.2)',
+                color: '#4caf50',
+                borderColor: '#4caf50',
+                border: '1px solid',
+                '& .MuiChip-deleteIcon:hover': {
+                  color: '#f44336 !important'
+                }
               }}
-            >
-              Limpiar Filtros
-            </Button>
+            />
           )}
         </Box>
       </Paper>
@@ -474,7 +572,7 @@ const SupervisorDashboard = () => {
                     />
                   </TableCell>
                   <TableCell sx={{ color: 'white' }}>
-                    {new Date(inc.fecha_creacion).toLocaleDateString()}
+                    {formatearFecha(inc.fecha_reporte)}
                   </TableCell>
                   <TableCell>
                     {inc.estado === 'pendiente' ? (

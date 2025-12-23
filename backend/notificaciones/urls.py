@@ -1,14 +1,29 @@
 from django.urls import path
 from .views import (
-    NotificacionListView,
-    NotificacionNoLeidasView,
-    MarcarNotificacionLeidaView,
-    MarcarTodasLeidasView
+    NotificacionesListView,
+    MarcarComoLeidaView,
+    MarcarTodasLeidasView,
+    EliminarNotificacionView,
+    EstadisticasNotificacionesView,
+    LimpiarNotificacionesAntiguasView,
 )
 
 urlpatterns = [
-    path('', NotificacionListView.as_view(), name='notificaciones-list'),
-    path('no-leidas/', NotificacionNoLeidasView.as_view(), name='notificaciones-no-leidas'),
-    path('<int:pk>/leer/', MarcarNotificacionLeidaView.as_view(), name='notificacion-leer'),
-    path('marcar-todas-leidas/', MarcarTodasLeidasView.as_view(), name='marcar-todas-leidas'),
+    # Listar notificaciones
+    path('notificaciones/', NotificacionesListView.as_view(), name='notificaciones-list'),
+    
+    # Estadísticas
+    path('notificaciones/estadisticas/', EstadisticasNotificacionesView.as_view(), name='notificaciones-estadisticas'),
+    
+    # Marcar como leída
+    path('notificaciones/<int:pk>/marcar-leida/', MarcarComoLeidaView.as_view(), name='marcar-leida'),
+    
+    # Marcar todas como leídas
+    path('notificaciones/marcar-todas-leidas/', MarcarTodasLeidasView.as_view(), name='marcar-todas-leidas'),
+    
+    # Eliminar notificación
+    path('notificaciones/<int:pk>/eliminar/', EliminarNotificacionView.as_view(), name='eliminar-notificacion'),
+    
+    # Limpiar antiguas
+    path('notificaciones/limpiar-antiguas/', LimpiarNotificacionesAntiguasView.as_view(), name='limpiar-antiguas'),
 ]

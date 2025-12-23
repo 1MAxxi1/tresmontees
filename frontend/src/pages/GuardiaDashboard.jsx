@@ -208,7 +208,8 @@ export default function GuardiaDashboard() {
     try {
       await api.post('/entregas/crear_entrega_completa/', {
         trabajador_rut: trabajador.rut,
-        caja_codigo: caja.codigo
+        caja_codigo: caja.codigo,
+        guardia_id: user.id
       });
 
       setStep('exito');
@@ -220,6 +221,7 @@ export default function GuardiaDashboard() {
         resetFlow();
       }, 2500);
     } catch (error) {
+      console.error('Error completo:', error.response?.data);
       toast.error(error.response?.data?.error || 'Error creando entrega');
     } finally {
       setLoading(false);

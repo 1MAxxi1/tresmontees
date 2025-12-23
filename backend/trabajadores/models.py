@@ -16,6 +16,14 @@ class Trabajador(models.Model):
         ('retirado', 'Retirado'),    # Ya retiró caja
     ]
     
+    AREA_CHOICES = [
+        ('produccion_manufactura', 'Producción y Manufactura'),
+        ('logistica_distribucion', 'Logística y Distribución'),
+        ('administracion', 'Administración'),
+        ('rrhh', 'Recursos Humanos'),
+        ('ingenieria_practicas', 'Ingeniería y Prácticas'),
+    ]
+    
     # Información Personal
     rut = models.CharField(
         max_length=12, 
@@ -35,12 +43,26 @@ class Trabajador(models.Model):
         max_length=100,
         verbose_name='Apellido Materno'
     )
+    email = models.EmailField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name='Email',
+        help_text='Correo electrónico del trabajador'
+    )
     
     # Información Laboral
     cargo = models.CharField(
         max_length=150,
         verbose_name='Cargo',
         help_text='Ej: Operario, Supervisor, Jefe de Turno'
+    )
+    area = models.CharField(
+        max_length=50,
+        choices=AREA_CHOICES,
+        verbose_name='Área/Departamento',
+        help_text='Área o departamento al que pertenece',
+        default='produccion_manufactura'
     )
     tipo_contrato = models.CharField(
         max_length=20,
@@ -64,6 +86,26 @@ class Trabajador(models.Model):
         choices=ESTADO_CHOICES,
         default='pendiente',
         verbose_name='Estado'
+    )
+    
+    # ✅ NUEVOS CAMPOS: QR
+    qr_generado = models.BooleanField(
+        default=False,
+        verbose_name='QR Generado',
+        help_text='Indica si se generó el código QR para este trabajador'
+    )
+    qr_fecha_generacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha Generación QR',
+        help_text='Fecha y hora en que se generó el QR'
+    )
+    qr_codigo = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name='Código QR',
+        help_text='Ruta o identificador del archivo QR generado'
     )
     
     # Campos Administrativos
@@ -108,3 +150,10 @@ class Trabajador(models.Model):
         """Marca al trabajador como pendiente de retiro"""
         self.estado = 'pendiente'
         self.save()
+    
+    def generar_qr(self):
+        """Marca al trabajador como que tiene QR generado"""
+        from django.utils import timezone
+        self.qr_generado = True
+        self.qr_fecha_generacion = timezone.now()
+        self.save(update_fields=['qr_generado', 'qr_fecha_generacion'])

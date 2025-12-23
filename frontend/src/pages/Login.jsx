@@ -157,20 +157,8 @@ const Login = () => {
             </Button>
           </Box>
 
-          <Box sx={{ mt: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-            <Typography variant="caption" sx={{ display: 'block', fontWeight: 'bold' }}>
-              Usuarios de prueba:
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block' }}>
-              rrhh01 / password123
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block' }}>
-              supervisor01 / password123
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block' }}>
-              guardia01 / password123
-            </Typography>
-          </Box>
+          
+          
         </Paper>
       </Container>
     </Box>

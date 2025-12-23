@@ -85,9 +85,7 @@ const RRHHLayout = () => {
 
           {/* PERFIL */}
           <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-            <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
-              {user.username?.charAt(0).toUpperCase() || 'R'}
-            </Avatar>
+            <Avatar>{user.first_name?.[0]?.toUpperCase() || user.username[0].toUpperCase()}</Avatar>  
           </IconButton>
 
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
@@ -158,7 +156,7 @@ const RRHHLayout = () => {
         {open && (
           <Box sx={{ p: 2, mt: 'auto', textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="caption">Sistema RRHH v1.0</Typography>
-            <Typography variant="caption" display="block">© 2024 Tres Montes</Typography>
+            <Typography variant="caption" display="block">Tres Montes</Typography>
           </Box>
         )}
       </Drawer>

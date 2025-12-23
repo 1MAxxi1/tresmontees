@@ -14,6 +14,9 @@ urlpatterns = [
     path('api/notificaciones/', include('notificaciones.urls')),
     path('api/qr/', include('qr_system.urls')),
     path('api/supervisor/', include('supervisor.urls')),
+    path('api/', include('campanas.urls')),
+    path('api/', include('configuracion.urls')),
+    path('api/', include('notificaciones.urls')),
 ]
 
 if settings.DEBUG:

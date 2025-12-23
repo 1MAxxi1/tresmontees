@@ -35,7 +35,6 @@ class EntregaSerializer(serializers.ModelSerializer):
     
     def validate_trabajador(self, value):
         """Validar que el trabajador esté activo"""
-        # CORREGIDO: activo en lugar de is_active
         if not value.activo:
             raise serializers.ValidationError(
                 'El trabajador no está activo en el sistema'
@@ -68,7 +67,7 @@ class EntregaSerializer(serializers.ModelSerializer):
         if not trabajador or not caja:
             return data
         
-        # CORREGIDO: Obtener sede del trabajador (compatible con sede o sucursal)
+        # Obtener sede del trabajador
         trabajador_sede = getattr(trabajador, 'sede', None) or getattr(trabajador, 'sucursal', None)
         caja_sucursal = caja.sucursal
         
@@ -83,7 +82,6 @@ class EntregaSerializer(serializers.ModelSerializer):
         tipo_trabajador = trabajador.tipo_contrato
         tipo_caja = caja.tipo_contrato
         
-        # CORREGIDO: Matriz de compatibilidad actualizada
         if tipo_trabajador == 'plazo_fijo' and tipo_caja != 'plazo_fijo':
             raise serializers.ValidationError({
                 'caja': f'Incompatibilidad de tipo de contrato: '
@@ -225,7 +223,7 @@ class EntregaCreateSerializer(serializers.Serializer):
         Buscar trabajador y caja según los datos proporcionados,
         validar compatibilidad y crear la entrega.
         """
-        # Buscar trabajador (CORREGIDO: activo en lugar de is_active)
+        # Buscar trabajador
         trabajador = None
         if validated_data.get('trabajador_id'):
             trabajador = Trabajador.objects.get(
@@ -261,19 +259,30 @@ class EntregaCreateSerializer(serializers.Serializer):
                 activa=True
             )
         
-        # Crear entrega usando el serializer principal
-        entrega_data = {
-            'trabajador': trabajador.id,
-            'caja': caja.id,
-            'guardia': self.context['request'].user.id,
-            'observaciones': validated_data.get('observaciones', ''),
-            'codigo_qr_trabajador': validated_data.get('trabajador_qr', ''),
-            'codigo_qr_caja': validated_data.get('caja_qr', '')
-        }
+        # CORREGIDO: Crear entrega directamente sin usar EntregaSerializer
+        # para evitar el error del guardia
+        guardia = self.context['request'].user
         
-        serializer = EntregaSerializer(data=entrega_data, context=self.context)
-        serializer.is_valid(raise_exception=True)
-        return serializer.save()
+        # Crear la entrega
+        entrega = Entrega.objects.create(
+            trabajador=trabajador,
+            caja=caja,
+            guardia=guardia,
+            observaciones=validated_data.get('observaciones', ''),
+            codigo_qr_trabajador=validated_data.get('trabajador_qr', ''),
+            codigo_qr_caja=validated_data.get('caja_qr', ''),
+            estado='entregado'
+        )
+        
+        # Descontar stock
+        caja.cantidad_disponible -= 1
+        caja.save(update_fields=['cantidad_disponible'])
+        
+        # Actualizar estado del trabajador
+        trabajador.estado = 'retirado'
+        trabajador.save(update_fields=['estado'])
+        
+        return entrega
 
 
 class ValidarSupervisorSerializer(serializers.Serializer):

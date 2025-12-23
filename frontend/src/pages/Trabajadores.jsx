@@ -32,6 +32,8 @@ import {
   QrCode2 as QrIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
+  QrCodeScanner as QrMasivoIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
@@ -70,9 +72,10 @@ export default function Trabajadores() {
     try {
       setLoading(true);
       const response = await api.get('/trabajadores/');
+      console.log('✅ Trabajadores cargados:', response.data.length);
       setTrabajadores(response.data);
     } catch (error) {
-      console.error('Error cargando trabajadores:', error);
+      console.error('❌ Error cargando trabajadores:', error);
       toast.error('Error cargando trabajadores');
     } finally {
       setLoading(false);
@@ -167,13 +170,63 @@ export default function Trabajadores() {
   };
 
   const generarQR = async (trabajador) => {
+    const loadingToast = toast.loading('Generando QR...');
+    
     try {
-      await api.post(`/trabajadores/${trabajador.id}/generar_qr/`);
-      toast.success(`QR generado para ${trabajador.nombre}`);
-      cargarTrabajadores();
+      // ✅ URL CORRECTA
+      const response = await api.post(`/trabajadores/${trabajador.id}/generar_qr/`);
+      console.log('✅ QR generado:', response.data);
+      
+      toast.success(`QR generado para ${trabajador.nombre}`, { id: loadingToast });
+      
+      // Esperar un momento y recargar
+      setTimeout(() => {
+        cargarTrabajadores();
+      }, 500);
+      
     } catch (error) {
-      console.error('Error generando QR:', error);
-      toast.error('Error al generar QR');
+      console.error('❌ Error generando QR:', error);
+      toast.error('Error al generar QR', { id: loadingToast });
+    }
+  };
+
+  // ✅ Generar QR Masivo - URL CORREGIDA
+  const generarQRMasivo = async () => {
+    const loadingToast = toast.loading('Generando QRs masivamente...');
+    
+    try {
+      // ✅ URL CORRECTA: /trabajadores/generar_qr_masivo/
+      const response = await api.post('/trabajadores/generar_qr_masivo/');
+      console.log('✅ Respuesta QR masivo:', response.data);
+      
+      toast.success(
+        `QRs generados: ${response.data.generados}${response.data.errores > 0 ? ` (${response.data.errores} errores)` : ''}`, 
+        { id: loadingToast }
+      );
+      
+      // Esperar un momento para que la BD se actualice
+      setTimeout(() => {
+        console.log('🔄 Recargando trabajadores...');
+        cargarTrabajadores();
+      }, 800);
+      
+    } catch (error) {
+      console.error('❌ Error generando QRs masivos:', error);
+      toast.error('Error al generar QRs masivos', { id: loadingToast });
+    }
+  };
+
+  // ✅ Enviar QR Masivo por email
+  const enviarQRMasivo = async () => {
+    const loadingToast = toast.loading('Enviando QRs por email...');
+    
+    try {
+      // ✅ URL CORRECTA
+      const response = await api.post('/trabajadores/enviar_qr_masivo/');
+      toast.success(response.data.message || 'QRs enviados correctamente', { id: loadingToast });
+    } catch (error) {
+      console.error('❌ Error enviando QRs masivos:', error);
+      toast.error('Error al enviar QRs masivos', { id: loadingToast });
     }
   };
 
@@ -226,66 +279,208 @@ export default function Trabajadores() {
         </Button>
       </Box>
 
+      {/* Acciones Masivas */}
+      <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <Typography variant="h6" sx={{ color: 'white', mb: 2, fontWeight: 'bold' }}>
+          Acciones Masivas
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <Button
+            variant="contained"
+            startIcon={<QrMasivoIcon />}
+            onClick={generarQRMasivo}
+            sx={{
+              bgcolor: '#2e7d32',
+              '&:hover': { bgcolor: '#1b5e20' },
+            }}
+          >
+            Generar QR Masivo
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<EmailIcon />}
+            onClick={enviarQRMasivo}
+            sx={{
+              color: 'white',
+              borderColor: 'rgba(255,255,255,0.3)',
+              '&:hover': {
+                borderColor: '#4caf50',
+                bgcolor: 'rgba(76, 175, 80, 0.1)',
+              },
+            }}
+          >
+            Enviar QR Masivo
+          </Button>
+        </Box>
+      </Paper>
+
       {/* Filtros */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: '#102010' }}>
-        <Grid container spacing={2} alignItems="center">
+      <Paper sx={{ p: 4, mb: 4, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <Typography variant="h6" sx={{ color: 'white', mb: 3, fontWeight: 'bold', fontSize: '1.1rem' }}>
+          Filtros de Búsqueda
+        </Typography>
+        
+        <Grid container spacing={3}>
+          {/* BÚSQUEDA POR TEXTO */}
           <Grid item xs={12} md={6}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Buscar trabajador
+            </Typography>
             <TextField
               fullWidth
-              size="small"
-              placeholder="Buscar por nombre, RUT o email..."
+              placeholder="Ingrese nombre, RUT o email..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
               InputProps={{
                 startAdornment: <SearchIcon sx={{ mr: 1, color: 'rgba(255,255,255,0.5)' }} />,
               }}
               sx={{
-                input: { color: 'white' },
-                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                '& .MuiInputBase-root': {
+                  color: 'white',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                },
+                '& .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.2)' 
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.3)' 
+                },
+                '& .Mui-focused .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: '#4caf50' 
+                }
               }}
             />
           </Grid>
 
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth size="small">
-              <InputLabel sx={{ color: 'white' }}>Estado</InputLabel>
+          {/* FILTRO POR ESTADO */}
+          <Grid item xs={12} md={3}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Estado del trabajador
+            </Typography>
+            <FormControl fullWidth>
               <Select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
-                label="Estado"
+                displayEmpty
                 sx={{
                   color: 'white',
-                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
                   '.MuiSvgIcon-root': { color: 'white' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4caf50' }
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: '#1a1a1a',
+                      '& .MuiMenuItem-root': {
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: 'rgba(76, 175, 80, 0.2)'
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: 'rgba(76, 175, 80, 0.3)',
+                          '&:hover': {
+                            bgcolor: 'rgba(76, 175, 80, 0.4)'
+                          }
+                        }
+                      }
+                    }
+                  }
                 }}
               >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="activo">Activos</MenuItem>
-                <MenuItem value="inactivo">Inactivos</MenuItem>
+                <MenuItem value="">Todos los trabajadores</MenuItem>
+                <MenuItem value="activo">Solo activos</MenuItem>
+                <MenuItem value="inactivo">Solo inactivos</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={2}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={limpiarFiltros}
-              startIcon={<ClearIcon />}
-              sx={{
-                color: 'white',
-                borderColor: 'white',
-                '&:hover': { borderColor: '#4caf50', color: '#4caf50' },
-              }}
-            >
-              Limpiar
-            </Button>
+          {/* BOTONES DE ACCIÓN */}
+          <Grid item xs={12} md={3}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Acciones
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => {}} // Los filtros ya se aplican automáticamente
+                sx={{ 
+                  bgcolor: '#2e7d32',
+                  height: '56px',
+                  fontWeight: 'bold',
+                  '&:hover': { bgcolor: '#1b5e20' }
+                }}
+              >
+                Aplicar
+              </Button>
+              {(busqueda || filtroEstado) && (
+                <Button
+                  variant="outlined"
+                  onClick={limpiarFiltros}
+                  sx={{ 
+                    color: 'white',
+                    height: '56px',
+                    minWidth: '56px',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': { 
+                      borderColor: '#f44336',
+                      bgcolor: 'rgba(244, 67, 54, 0.1)',
+                      color: '#f44336'
+                    }
+                  }}
+                  title="Limpiar filtros"
+                >
+                  <ClearIcon />
+                </Button>
+              )}
+            </Box>
           </Grid>
         </Grid>
 
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 2 }}>
-          Total: {trabajadoresFiltrados.length} trabajadores
-        </Typography>
+        {/* INFORMACIÓN DE RESULTADOS */}
+        <Box sx={{ 
+          mt: 3, 
+          pt: 3, 
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: '500' }}>
+              Mostrando <strong style={{ color: '#4caf50' }}>{trabajadoresFiltrados.length}</strong> de <strong>{trabajadores.length}</strong> trabajadores
+            </Typography>
+            {(busqueda || filtroEstado) && (
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                {busqueda && `Búsqueda: "${busqueda}"`}
+                {busqueda && filtroEstado && ' • '}
+                {filtroEstado && `Estado: ${filtroEstado === 'activo' ? 'Activos' : 'Inactivos'}`}
+              </Typography>
+            )}
+          </Box>
+          
+          {(busqueda || filtroEstado) && (
+            <Chip
+              label="Filtros activos"
+              onDelete={limpiarFiltros}
+              deleteIcon={<ClearIcon sx={{ color: 'white !important' }} />}
+              sx={{
+                bgcolor: 'rgba(76, 175, 80, 0.2)',
+                color: '#4caf50',
+                borderColor: '#4caf50',
+                border: '1px solid',
+                '& .MuiChip-deleteIcon:hover': {
+                  color: '#f44336 !important'
+                }
+              }}
+            />
+          )}
+        </Box>
       </Paper>
 
       {/* Tabla */}
@@ -304,6 +499,7 @@ export default function Trabajadores() {
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cargo</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo Contrato</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado QR</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -331,6 +527,14 @@ export default function Trabajadores() {
                       label={trabajador.activo ? 'Activo' : 'Inactivo'}
                       color={trabajador.activo ? 'success' : 'error'}
                       size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={trabajador.qr_generado ? 'QR Generado' : 'No Generado'}
+                      color={trabajador.qr_generado ? 'success' : 'default'}
+                      size="small"
+                      variant={trabajador.qr_generado ? 'filled' : 'outlined'}
                     />
                   </TableCell>
                   <TableCell>

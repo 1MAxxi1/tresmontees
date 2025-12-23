@@ -76,9 +76,8 @@ const SupervisorLayout = () => {
 
           {/* PERFIL */}
           <IconButton onClick={handleMenuOpen} sx={{ p: 0 }}>
-            <Avatar sx={{ bgcolor: 'secondary.main', width: 40, height: 40 }}>
-              {user.username?.charAt(0).toUpperCase() || 'S'}
-            </Avatar>
+            {user.first_name?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || 'U'}
+          
           </IconButton>
 
           <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
@@ -149,7 +148,7 @@ const SupervisorLayout = () => {
         {open && (
           <Box sx={{ p: 2, mt: 'auto', textAlign: 'center', borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="caption">Sistema Supervisor v1.0</Typography>
-            <Typography variant="caption" display="block">© 2024 Tres Montes</Typography>
+            <Typography variant="caption" display="block">Tres Montes</Typography>
           </Box>
         )}
       </Drawer>

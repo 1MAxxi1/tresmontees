@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'notificaciones',
     'qr_system',
     'supervisor',
+    'campanas',
+    'configuracion',
 ]
 
 MIDDLEWARE = [

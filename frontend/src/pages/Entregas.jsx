@@ -3,154 +3,467 @@ import {
   Box,
   Paper,
   Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  CircularProgress,
-  Alert,
-  Tabs,
-  Tab,
-  TextField,
+  Button,
+  Stepper,
+  Step,
+  StepLabel,
   Grid,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Button,
+  FormLabel,
+  RadioGroup,
+  Radio,
+  Checkbox,
+  FormGroup,
+  FormControlLabel,
+  TextField,
+  Card,
+  CardContent,
+  Chip,
+  Alert,
+  CircularProgress,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
   IconButton,
-  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+
 } from '@mui/material';
 import {
-  LocalShipping as ShippingIcon,
-  Search as SearchIcon,
-  Clear as ClearIcon,
-  FileDownload as DownloadIcon,
-  Visibility as ViewIcon,
+  ArrowBack as BackIcon,
+  ArrowForward as ForwardIcon,
+  Check as CheckIcon,
+  Close as CloseIcon,
+  PlayArrow as ActivateIcon,
+  Stop as StopIcon,
+  BarChart as StatsIcon,
+  Add as AddIcon,
 } from '@mui/icons-material';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const Entregas = () => {
-  const [tabValue, setTabValue] = useState(0);
-  const [entregas, setEntregas] = useState([]);
+const AREAS_OPTIONS = [
+  { value: 'produccion_manufactura', label: 'Producción y Manufactura' },
+  { value: 'logistica_distribucion', label: 'Logística y Distribución' },
+  { value: 'administracion', label: 'Administración' },
+  { value: 'rrhh', label: 'Recursos Humanos' },
+  { value: 'ingenieria_practicas', label: 'Ingeniería y Prácticas' },
+];
+
+const GestionEntregas = () => {
+  const [campanas, setCampanas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [estadisticasDialog, setEstadisticasDialog] = useState(null);
   
-  // Filtros
-  const [busqueda, setBusqueda] = useState('');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [filtroGuardia, setFiltroGuardia] = useState('');
-  const [filtroTipoCaja, setFiltroTipoCaja] = useState('');
-  
-  // Listas para filtros
-  const [guardias, setGuardias] = useState([]);
+  // Estado del formulario
+  const [formData, setFormData] = useState({
+    nombre: '',
+    descripcion: '',
+    sucursal: '',
+    tipo_entrega: 'general',
+    areas_seleccionadas: [],
+    tipo_contrato: '',
+    fecha_inicio: '',
+    fecha_fin: '',
+  });
+
+  const steps = ['Sucursal', 'Tipo de Entrega', 'Tipo de Contrato', 'Confirmar'];
 
   useEffect(() => {
-    cargarEntregas();
-    cargarGuardias();
+    cargarCampanas();
   }, []);
 
-  const cargarEntregas = async () => {
+  const cargarCampanas = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/entregas/');
-      setEntregas(response.data);
+      const response = await api.get('/campanas/');
+      setCampanas(response.data);
     } catch (error) {
-      console.error('Error cargando entregas:', error);
-      toast.error('Error cargando entregas');
+      console.error('Error cargando campañas:', error);
+      toast.error('Error cargando campañas');
     } finally {
       setLoading(false);
     }
   };
 
-  const cargarGuardias = async () => {
+  const abrirWizard = () => {
+    setFormData({
+      nombre: '',
+      descripcion: '',
+      sucursal: '',
+      tipo_entrega: 'general',
+      areas_seleccionadas: [],
+      tipo_contrato: '',
+      fecha_inicio: '',
+      fecha_fin: '',
+    });
+    setActiveStep(0);
+    setWizardOpen(true);
+  };
+
+  const cerrarWizard = () => {
+    setWizardOpen(false);
+    setActiveStep(0);
+  };
+
+  const handleNext = () => {
+    // Validaciones por paso
+    if (activeStep === 0 && !formData.sucursal) {
+      toast.error('Debe seleccionar una sucursal');
+      return;
+    }
+    if (activeStep === 1) {
+      if (formData.tipo_entrega === 'grupo' && formData.areas_seleccionadas.length === 0) {
+        toast.error('Debe seleccionar al menos un área');
+        return;
+      }
+    }
+    if (activeStep === 2 && !formData.tipo_contrato) {
+      toast.error('Debe seleccionar un tipo de contrato');
+      return;
+    }
+
+    setActiveStep((prev) => prev + 1);
+  };
+
+  const handleBack = () => {
+    setActiveStep((prev) => prev - 1);
+  };
+
+  const handleSubmit = async () => {
+    // Validar nombre y fechas
+    if (!formData.nombre.trim()) {
+      toast.error('Debe ingresar un nombre para la campaña');
+      return;
+    }
+    if (!formData.fecha_inicio || !formData.fecha_fin) {
+      toast.error('Debe ingresar las fechas de inicio y fin');
+      return;
+    }
+
     try {
-      const response = await api.get('/usuarios/');
-      // Filtrar solo guardias
-      const guardiasList = response.data.filter(u => u.rol === 'guardia');
-      setGuardias(guardiasList);
+      await api.post('/campanas/crear/', formData);
+      toast.success('Campaña creada exitosamente');
+      cerrarWizard();
+      cargarCampanas();
     } catch (error) {
-      console.error('Error cargando guardias:', error);
+      console.error('Error creando campaña:', error);
+      toast.error(error.response?.data?.error || 'Error creando campaña');
     }
   };
 
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+  const finalizarCampana = async (id) => {
+    if (!window.confirm('¿Está seguro de que desea finalizar esta campaña?')) return;
+
+    try {
+      await api.post(`/campanas/${id}/finalizar/`);
+      toast.success('Campaña finalizada correctamente');
+      cargarCampanas();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error finalizando campaña');
+    }
   };
 
-  const limpiarFiltros = () => {
-    setBusqueda('');
-    setFechaDesde('');
-    setFechaHasta('');
-    setFiltroGuardia('');
-    setFiltroTipoCaja('');
-    toast.success('Filtros limpiados');
+  const reactivarCampana = async (id) => {
+    try {
+      await api.post(`/campanas/${id}/reactivar/`);
+      toast.success('Campaña reactivada correctamente');
+      cargarCampanas();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error reactivando campaña');
+    }
   };
 
-  const exportarExcel = () => {
-    toast.success('Exportando a Excel... (función en desarrollo)');
-    // Aquí puedes agregar la lógica para exportar a Excel
+  const verEstadisticas = async (id) => {
+    try {
+      const response = await api.get(`/campanas/${id}/estadisticas/`);
+      setEstadisticasDialog(response.data);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Error cargando estadísticas');
+    }
   };
 
-  const formatearFecha = (fecha) => {
-    const date = new Date(fecha);
-    return date.toLocaleDateString('es-CL', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const renderStepContent = () => {
+    switch (activeStep) {
+      case 0:
+        return (
+          <Box>
+            <Typography variant="h6" sx={{ color: 'white', mb: 3 }}>
+              Seleccione la Sucursal
+            </Typography>
+            <FormControl component="fieldset">
+              <RadioGroup
+                value={formData.sucursal}
+                onChange={(e) => setFormData({ ...formData, sucursal: e.target.value })}
+              >
+                <FormControlLabel
+                  value="casablanca"
+                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
+                  label={<Typography sx={{ color: 'white' }}>Casablanca</Typography>}
+                />
+                <FormControlLabel
+                  value="valparaiso_bif"
+                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
+                  label={<Typography sx={{ color: 'white' }}>Valparaíso – Planta BIF</Typography>}
+                />
+                <FormControlLabel
+                  value="valparaiso_bic"
+                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
+                  label={<Typography sx={{ color: 'white' }}>Valparaíso – Planta BIC</Typography>}
+                />
+              </RadioGroup>
+            </FormControl>
+          </Box>
+        );
+
+      case 1:
+        return (
+          <Box>
+            <Typography variant="h6" sx={{ color: 'white', mb: 3 }}>
+              Tipo de Entrega
+            </Typography>
+            <FormControl component="fieldset" sx={{ mb: 3 }}>
+              <RadioGroup
+                value={formData.tipo_entrega}
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value;
+                  setFormData({
+                    ...formData,
+                    tipo_entrega: nuevoTipo,
+                    areas_seleccionadas: nuevoTipo === 'general' ? AREAS_OPTIONS.map(a => a.value) : []
+                  });
+                }}
+              >
+                <FormControlLabel
+                  value="general"
+                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
+                  label={<Typography sx={{ color: 'white' }}>General (Todas las áreas)</Typography>}
+                />
+                <FormControlLabel
+                  value="grupo"
+                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
+                  label={<Typography sx={{ color: 'white' }}>Por Grupo (Seleccionar áreas)</Typography>}
+                />
+              </RadioGroup>
+            </FormControl>
+
+            {formData.tipo_entrega === 'grupo' && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle1" sx={{ color: 'white', mb: 2 }}>
+                  Seleccione las áreas:
+                </Typography>
+                <FormGroup>
+                  {AREAS_OPTIONS.map((area) => (
+                    <FormControlLabel
+                      key={area.value}
+                      control={
+                        <Checkbox
+                          checked={formData.areas_seleccionadas.includes(area.value)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                areas_seleccionadas: [...formData.areas_seleccionadas, area.value]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                areas_seleccionadas: formData.areas_seleccionadas.filter(a => a !== area.value)
+                              });
+                            }
+                          }}
+                          sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }}
+                        />
+                      }
+                      label={<Typography sx={{ color: 'white' }}>{area.label}</Typography>}
+                    />
+                  ))}
+                </FormGroup>
+              </Box>
+            )}
+          </Box>
+        );
+
+      case 2:
+  return (
+    <Box>
+      <Typography variant="h6" sx={{ color: 'white', mb: 3 }}>
+        Tipo de Contrato
+      </Typography>
+      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
+        Seleccione uno o ambos tipos de contrato:
+      </Typography>
+      <FormGroup>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={formData.tipo_contrato.includes('indefinido')}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setFormData({
+                    ...formData,
+                    tipo_contrato: [...formData.tipo_contrato, 'indefinido']
+                  });
+                } else {
+                  setFormData({
+                    ...formData,
+                    tipo_contrato: formData.tipo_contrato.filter(t => t !== 'indefinido')
+                  });
+                }
+              }}
+              sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }}
+            />
+          }
+          label={<Typography sx={{ color: 'white' }}>Indefinido</Typography>}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={formData.tipo_contrato.includes('plazo_fijo')}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setFormData({
+                    ...formData,
+                    tipo_contrato: [...formData.tipo_contrato, 'plazo_fijo']
+                  });
+                } else {
+                  setFormData({
+                    ...formData,
+                    tipo_contrato: formData.tipo_contrato.filter(t => t !== 'plazo_fijo')
+                  });
+                }
+              }}
+              sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }}
+            />
+          }
+          label={<Typography sx={{ color: 'white' }}>Plazo Fijo</Typography>}
+        />
+      </FormGroup>
+    </Box>
+  );
+
+      case 3:
+        return (
+          <Box>
+            <Typography variant="h6" sx={{ color: 'white', mb: 3 }}>
+              Confirmar Creación de Campaña
+            </Typography>
+
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Nombre de la Campaña"
+                  placeholder="Ej: Entrega Navidad 2025"
+                  value={formData.nombre}
+                  onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                  sx={{
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputBase-input': { color: 'white' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  label="Descripción (Opcional)"
+                  value={formData.descripcion}
+                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  sx={{
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputBase-input': { color: 'white' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Fecha de Inicio"
+                  value={formData.fecha_inicio}
+                  onChange={(e) => setFormData({ ...formData, fecha_inicio: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputBase-input': { color: 'white' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  }}
+                />
+              </Grid>
+
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Fecha de Fin"
+                  value={formData.fecha_fin}
+                  onChange={(e) => setFormData({ ...formData, fecha_fin: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                    '& .MuiInputBase-input': { color: 'white' },
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  }}
+                />
+              </Grid>
+            </Grid>
+
+            <Paper sx={{ mt: 4, p: 3, bgcolor: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50' }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', mb: 2 }}>
+                📋 Resumen de la Campaña
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Sucursal:</Typography>
+                  <Typography sx={{ color: 'white', fontWeight: 'bold' }}>
+                    {formData.sucursal === 'casablanca' && 'Casablanca'}
+                    {formData.sucursal === 'valparaiso_bif' && 'Valparaíso – Planta BIF'}
+                    {formData.sucursal === 'valparaiso_bic' && 'Valparaíso – Planta BIC'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Tipo:</Typography>
+                  <Typography sx={{ color: 'white', fontWeight: 'bold' }}>
+                    {formData.tipo_entrega === 'general' ? 'General' : 'Por Grupo'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Áreas:</Typography>
+                  <Typography sx={{ color: 'white', fontWeight: 'bold' }}>
+                    {formData.tipo_entrega === 'general' ? 'Todas' : `${formData.areas_seleccionadas.length} seleccionadas`}
+                  </Typography>
+                </Grid>
+                <Grid item xs={6}>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Contrato:</Typography>
+                  <Typography sx={{ color: 'white', fontWeight: 'bold' }}>
+                    {formData.tipo_contrato === 'indefinido' ? 'Indefinido' : 'Plazo Fijo'}
+                  </Typography>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Box>
+        );
+
+      default:
+        return null;
+    }
   };
-
-  const formatearTipoContrato = (tipo) => {
-    if (tipo === 'indefinido') return 'Indefinido';
-    if (tipo === 'plazo_fijo') return 'Plazo Fijo';
-    return tipo || 'N/A';
-  };
-
-  // Filtrar entregas
-  const entregasFiltradas = entregas.filter(entrega => {
-    // Búsqueda por texto
-    const cumpleBusqueda = !busqueda || 
-      entrega.trabajador?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      entrega.trabajador?.apellido_paterno?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      entrega.trabajador?.rut?.includes(busqueda) ||
-      entrega.caja?.codigo?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      entrega.guardia?.username?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      entrega.guardia?.first_name?.toLowerCase().includes(busqueda.toLowerCase());
-
-    // Filtro por fecha desde
-    const cumpleFechaDesde = !fechaDesde || 
-      new Date(entrega.fecha_entrega) >= new Date(fechaDesde);
-
-    // Filtro por fecha hasta
-    const cumpleFechaHasta = !fechaHasta || 
-      new Date(entrega.fecha_entrega) <= new Date(fechaHasta + 'T23:59:59');
-
-    // Filtro por guardia
-    const cumpleGuardia = !filtroGuardia || 
-      entrega.guardia?.id === parseInt(filtroGuardia);
-
-    // Filtro por tipo de caja
-    const cumpleTipoCaja = !filtroTipoCaja || 
-      entrega.caja?.tipo_contrato === filtroTipoCaja;
-
-    return cumpleBusqueda && cumpleFechaDesde && cumpleFechaHasta && cumpleGuardia && cumpleTipoCaja;
-  });
-
-  // Estadísticas
-  const entregasHoy = entregas.filter(e => {
-    const hoy = new Date().toISOString().split('T')[0];
-    return e.fecha_entrega?.startsWith(hoy);
-  });
-
-  const cajasIndefinido = entregasFiltradas.filter(e => e.caja?.tipo_contrato === 'indefinido').length;
-  const cajasPlazoFijo = entregasFiltradas.filter(e => e.caja?.tipo_contrato === 'plazo_fijo').length;
 
   if (loading) {
     return (
@@ -162,381 +475,259 @@ const Entregas = () => {
 
   return (
     <Box>
-      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>
-          <ShippingIcon sx={{ mr: 2, verticalAlign: 'middle' }} />
           Gestión de Entregas
         </Typography>
         <Button
           variant="contained"
-          startIcon={<DownloadIcon />}
-          onClick={exportarExcel}
+          startIcon={<AddIcon />}
+          onClick={abrirWizard}
           sx={{
             bgcolor: '#2e7d32',
-            '&:hover': { bgcolor: '#1b5e20' },
-            fontWeight: 'bold',
+            '&:hover': { bgcolor: '#1b5e20' }
           }}
         >
-          Exportar Excel
+          Nueva Campaña
         </Button>
       </Box>
 
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange} 
-        sx={{ 
-          mb: 3,
-          '& .MuiTab-root': { color: 'rgba(255,255,255,0.7)' },
-          '& .Mui-selected': { color: 'white' },
+      {/* Lista de campañas */}
+      {campanas.length === 0 ? (
+        <Alert severity="info">No hay campañas de entrega creadas</Alert>
+      ) : (
+        <TableContainer component={Paper} sx={{ bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <Table>
+            <TableHead sx={{ bgcolor: '#09320f' }}>
+              <TableRow>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Nombre</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Sucursal</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Contrato</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fechas</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Progreso</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acciones</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {campanas.map((campana) => (
+                <TableRow key={campana.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}>
+                  <TableCell sx={{ color: 'white' }}>
+                    {campana.nombre}
+                    {campana.descripcion && (
+                      <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.5)' }}>
+                        {campana.descripcion}
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ color: 'white' }}>{campana.sucursal_nombre}</TableCell>
+                  <TableCell sx={{ color: 'white' }}>{campana.areas_display}</TableCell>
+                  <TableCell sx={{ color: 'white' }}>{campana.tipos_contrato_display}</TableCell>
+                  <TableCell sx={{ color: 'white', fontSize: '0.875rem' }}>
+                    {new Date(campana.fecha_inicio).toLocaleDateString('es-ES')} -<br />
+                    {new Date(campana.fecha_fin).toLocaleDateString('es-ES')}
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={campana.esta_vigente ? 'Vigente' : (campana.activa ? 'Activa' : 'Finalizada')}
+                      color={campana.esta_vigente ? 'success' : (campana.activa ? 'warning' : 'default')}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell sx={{ color: 'white' }}>
+                    {campana.entregas_realizadas} / {campana.trabajadores_elegibles}
+                  </TableCell>
+                  <TableCell>
+                    <IconButton
+                      size="small"
+                      onClick={() => verEstadisticas(campana.id)}
+                      sx={{ color: '#2196f3' }}
+                      title="Ver estadísticas"
+                    >
+                      <StatsIcon />
+                    </IconButton>
+                    {campana.activa ? (
+                      <IconButton
+                        size="small"
+                        onClick={() => finalizarCampana(campana.id)}
+                        sx={{ color: '#f44336' }}
+                        title="Finalizar"
+                      >
+                        <StopIcon />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        size="small"
+                        onClick={() => reactivarCampana(campana.id)}
+                        sx={{ color: '#4caf50' }}
+                        title="Reactivar"
+                      >
+                        <ActivateIcon />
+                      </IconButton>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
+      {/* Dialog Wizard */}
+      <Dialog
+        open={wizardOpen}
+        onClose={cerrarWizard}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { bgcolor: '#102010', color: 'white' }
         }}
       >
-        <Tab label="Historial de Entregas" />
-        <Tab label="Estadísticas" />
-      </Tabs>
-
-      {tabValue === 0 && (
-        <>
-          {/* Panel de Filtros */}
-          <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010' }}>
-            <Typography variant="h6" sx={{ color: 'white', mb: 2, fontWeight: 'bold' }}>
-              🔍 Filtros de Búsqueda
-            </Typography>
-
-            <Grid container spacing={2}>
-              {/* Búsqueda por texto */}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Buscar"
-                  placeholder="Nombre, RUT, código de caja o guardia..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                  InputProps={{
-                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'rgba(255,255,255,0.5)' }} />,
+        <DialogTitle sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">Nueva Campaña de Entrega</Typography>
+            <IconButton onClick={cerrarWizard} sx={{ color: 'white' }}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ mt: 2 }}>
+          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel
+                  StepIconProps={{
+                    sx: {
+                      color: 'rgba(255,255,255,0.3)',
+                      '&.Mui-active': { color: '#4caf50' },
+                      '&.Mui-completed': { color: '#4caf50' },
+                    }
                   }}
                   sx={{
-                    '& .MuiInputBase-root': { color: 'white' },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  }}
-                />
-              </Grid>
-
-              {/* Fecha desde */}
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Fecha Desde"
-                  value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    '& .MuiInputBase-root': { color: 'white' },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  }}
-                />
-              </Grid>
-
-              {/* Fecha hasta */}
-              <Grid item xs={12} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Fecha Hasta"
-                  value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    '& .MuiInputBase-root': { color: 'white' },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  }}
-                />
-              </Grid>
-
-              {/* Filtro por guardia */}
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Guardia</InputLabel>
-                  <Select
-                    value={filtroGuardia}
-                    onChange={(e) => setFiltroGuardia(e.target.value)}
-                    label="Guardia"
-                    sx={{
-                      color: 'white',
-                      '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '.MuiSvgIcon-root': { color: 'white' },
-                    }}
-                  >
-                    <MenuItem value="">Todos los guardias</MenuItem>
-                    {guardias.map(guardia => (
-                      <MenuItem key={guardia.id} value={guardia.id}>
-                        {guardia.first_name || guardia.username}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Filtro por tipo de caja */}
-              <Grid item xs={12} md={4}>
-                <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Tipo de Caja</InputLabel>
-                  <Select
-                    value={filtroTipoCaja}
-                    onChange={(e) => setFiltroTipoCaja(e.target.value)}
-                    label="Tipo de Caja"
-                    sx={{
-                      color: 'white',
-                      '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '.MuiSvgIcon-root': { color: 'white' },
-                    }}
-                  >
-                    <MenuItem value="">Todos los tipos</MenuItem>
-                    <MenuItem value="indefinido">Indefinido</MenuItem>
-                    <MenuItem value="plazo_fijo">Plazo Fijo</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-
-              {/* Botón Limpiar */}
-              <Grid item xs={12} md={4}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={limpiarFiltros}
-                  startIcon={<ClearIcon />}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'white',
-                    '&:hover': { borderColor: '#4caf50', color: '#4caf50' },
-                    height: '40px',
+                    '& .MuiStepLabel-label': {
+                      color: 'rgba(255,255,255,0.5)',
+                      '&.Mui-active': { color: 'white' },
+                      '&.Mui-completed': { color: 'rgba(255,255,255,0.7)' },
+                    }
                   }}
                 >
-                  Limpiar Filtros
-                </Button>
-              </Grid>
-            </Grid>
+                  {label}
+                </StepLabel>
+              </Step>
+            ))}
+          </Stepper>
 
-            {/* Contador de resultados */}
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                📊 Total: {entregasFiltradas.length} entregas
-              </Typography>
-              {(busqueda || fechaDesde || fechaHasta || filtroGuardia || filtroTipoCaja) && (
-                <Chip
-                  label="Filtros activos"
-                  color="success"
-                  size="small"
-                />
-              )}
-            </Box>
-          </Paper>
+          {renderStepContent()}
+        </DialogContent>
 
-          {/* Tabla de Entregas */}
-          {entregasFiltradas.length === 0 ? (
-            <Alert severity="info">
-              No hay entregas para mostrar con los filtros aplicados
-            </Alert>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2 }}>
+          <Button
+            onClick={activeStep === 0 ? cerrarWizard : handleBack}
+            startIcon={<BackIcon />}
+            sx={{ color: 'white' }}
+          >
+            {activeStep === 0 ? 'Cancelar' : 'Atrás'}
+          </Button>
+          {activeStep === steps.length - 1 ? (
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              startIcon={<CheckIcon />}
+              sx={{
+                bgcolor: '#2e7d32',
+                '&:hover': { bgcolor: '#1b5e20' }
+              }}
+            >
+              Crear Campaña
+            </Button>
           ) : (
-            <TableContainer component={Paper} sx={{ bgcolor: '#102010' }}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: '#09320f' }}>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Trabajador</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>RUT</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Código Caja</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo Caja</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Guardia</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha y Hora</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
-                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {entregasFiltradas.map((entrega) => (
-                    <TableRow
-                      key={entrega.id}
-                      sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}
-                    >
-                      {/* ID */}
-                      <TableCell sx={{ color: 'white' }}>{entrega.id}</TableCell>
-                      
-                      {/* Trabajador - Nombre Completo */}
-                      <TableCell sx={{ color: 'white' }}>
-                        {entrega.trabajador?.nombre} {entrega.trabajador?.apellido_paterno} {entrega.trabajador?.apellido_materno}
-                      </TableCell>
-
-                      {/* RUT */}
-                      <TableCell sx={{ color: 'white' }}>
-                        {entrega.trabajador?.rut || 'N/A'}
-                      </TableCell>
-
-                      {/* Código Caja */}
-                      <TableCell>
-                        <Chip
-                          label={entrega.caja?.codigo || 'N/A'}
-                          size="small"
-                          sx={{ 
-                            bgcolor: 'rgba(147, 51, 234, 0.2)', 
-                            color: '#a855f7', 
-                            fontWeight: 'bold',
-                            border: '1px solid rgba(147, 51, 234, 0.3)'
-                          }}
-                        />
-                      </TableCell>
-
-                      {/* Tipo Caja */}
-                      <TableCell>
-                        <Chip
-                          label={formatearTipoContrato(entrega.caja?.tipo_contrato)}
-                          size="small"
-                          color={entrega.caja?.tipo_contrato === 'indefinido' ? 'success' : 'warning'}
-                        />
-                      </TableCell>
-
-                      {/* Guardia */}
-                      <TableCell sx={{ color: 'white' }}>
-                        <Tooltip title={`Usuario: ${entrega.guardia?.username || 'N/A'}`}>
-                          <Box>
-                            {entrega.guardia?.first_name || entrega.guardia?.username || 'N/A'}
-                          </Box>
-                        </Tooltip>
-                      </TableCell>
-
-                      {/* Fecha y Hora */}
-                      <TableCell sx={{ color: 'white' }}>
-                        {formatearFecha(entrega.fecha_entrega)}
-                      </TableCell>
-
-                      {/* Estado */}
-                      <TableCell>
-                        <Chip
-                          label="Completada"
-                          color="success"
-                          size="small"
-                        />
-                      </TableCell>
-
-                      {/* Acciones */}
-                      <TableCell>
-                        <Tooltip title="Ver detalle">
-                          <IconButton
-                            size="small"
-                            sx={{ color: '#3b82f6' }}
-                            onClick={() => toast.info(`Detalle de entrega #${entrega.id}`)}
-                          >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <Button
+              onClick={handleNext}
+              variant="contained"
+              endIcon={<ForwardIcon />}
+              sx={{
+                bgcolor: '#2e7d32',
+                '&:hover': { bgcolor: '#1b5e20' }
+              }}
+            >
+              Siguiente
+            </Button>
           )}
+        </DialogActions>
+      </Dialog>
 
-          {/* Resumen Total */}
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-              Total de entregas: {entregas.length}
-            </Typography>
-          </Box>
-        </>
-      )}
-
-      {/* TAB ESTADÍSTICAS */}
-      {tabValue === 1 && (
-        <Paper sx={{ p: 3, bgcolor: '#102010' }}>
-          <Typography variant="h6" gutterBottom sx={{ color: 'white', fontWeight: 'bold', mb: 3 }}>
-            📊 Estadísticas de Entregas
-          </Typography>
-          
-          <Grid container spacing={3}>
-            {/* Total de entregas */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #10b981' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Total de entregas
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#10b981', fontWeight: 'bold' }}>
-                  {entregas.length}
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* Entregas hoy */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #3b82f6' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Entregas hoy
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#3b82f6', fontWeight: 'bold' }}>
-                  {entregasHoy.length}
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* Entregas esta semana */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #f59e0b' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Cajas Indefinido
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#f59e0b', fontWeight: 'bold' }}>
-                  {cajasIndefinido}
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* Cajas Plazo Fijo */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #8b5cf6' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Cajas Plazo Fijo
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#8b5cf6', fontWeight: 'bold' }}>
-                  {cajasPlazoFijo}
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* Guardias activos */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #ec4899' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Guardias registrados
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#ec4899', fontWeight: 'bold' }}>
-                  {guardias.length}
-                </Typography>
-              </Paper>
-            </Grid>
-
-            {/* Promedio diario */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#1a3a1a', borderTop: '4px solid #06b6d4' }}>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
-                  Promedio diario
-                </Typography>
-                <Typography variant="h3" sx={{ color: '#06b6d4', fontWeight: 'bold' }}>
-                  {entregas.length > 0 ? Math.round(entregas.length / 30) : 0}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-        </Paper>
-      )}
+      {/* Dialog Estadísticas */}
+      <Dialog
+        open={Boolean(estadisticasDialog)}
+        onClose={() => setEstadisticasDialog(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { bgcolor: '#102010', color: 'white' }
+        }}
+      >
+        <DialogTitle>Estadísticas de Campaña</DialogTitle>
+        <DialogContent>
+          {estadisticasDialog && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="h6" sx={{ color: '#4caf50', mb: 2 }}>
+                {estadisticasDialog.campana.nombre}
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'rgba(33, 150, 243, 0.1)', border: '1px solid #2196f3' }}>
+                    <Typography variant="h4" sx={{ color: '#2196f3' }}>
+                      {estadisticasDialog.trabajadores_elegibles}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Trabajadores Elegibles
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4caf50' }}>
+                    <Typography variant="h4" sx={{ color: '#4caf50' }}>
+                      {estadisticasDialog.entregas_realizadas}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Entregas Realizadas
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'rgba(255, 152, 0, 0.1)', border: '1px solid #ff9800' }}>
+                    <Typography variant="h4" sx={{ color: '#ff9800' }}>
+                      {estadisticasDialog.entregas_pendientes}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Pendientes
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6}>
+                  <Paper sx={{ p: 2, bgcolor: 'rgba(156, 39, 176, 0.1)', border: '1px solid #9c27b0' }}>
+                    <Typography variant="h4" sx={{ color: '#9c27b0' }}>
+                      {estadisticasDialog.porcentaje_completado}%
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Completado
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEstadisticasDialog(null)} sx={{ color: 'white' }}>
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
 
-export default Entregas;
+export default GestionEntregas;

@@ -36,6 +36,38 @@ import {
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
+// Función helper para formatear fechas - Maneja microsegundos de Django
+const formatearFecha = (fecha) => {
+  if (!fecha) return 'N/A';
+  
+  try {
+    // Si la fecha viene como string con microsegundos, los removemos
+    let fechaLimpia = fecha;
+    if (typeof fecha === 'string') {
+      // Remover microsegundos: de .957005-03:00 a .957-03:00
+      fechaLimpia = fecha.replace(/(\.\d{3})\d+/, '$1');
+    }
+    
+    const date = new Date(fechaLimpia);
+    
+    if (isNaN(date.getTime())) {
+      console.error('Fecha inválida:', fecha);
+      return 'Fecha inválida';
+    }
+    
+    const dia = String(date.getDate()).padStart(2, '0');
+    const mes = String(date.getMonth() + 1).padStart(2, '0');
+    const anio = date.getFullYear();
+    const horas = String(date.getHours()).padStart(2, '0');
+    const minutos = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${dia}-${mes}-${anio} ${horas}:${minutos} hrs`;
+  } catch (error) {
+    console.error('Error formateando fecha:', error, fecha);
+    return 'Error';
+  }
+};
+
 const SupervisorIncidencias = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [incidencias, setIncidencias] = useState([]);
@@ -96,7 +128,7 @@ const SupervisorIncidencias = () => {
     try {
       await api.patch(`/supervisor/incidencias/${incidenciaSeleccionada.id}/actualizar/`, {
         estado: accionPendiente,
-        comentario_resolucion: comentario
+        solucion: comentario
       });
 
       toast.success('Incidencia actualizada correctamente');
@@ -170,60 +202,169 @@ const SupervisorIncidencias = () => {
         Gestión de Incidencias
       </Typography>
 
-      {/* Filtros */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010' }}>
-        <Grid container spacing={2} alignItems="center">
+      {/* Filtros - Diseño profesional mejorado */}
+      <Paper sx={{ p: 4, mb: 4, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <Typography variant="h6" sx={{ color: 'white', mb: 3, fontWeight: 'bold', fontSize: '1.1rem' }}>
+          Filtros de Búsqueda
+        </Typography>
+        
+        <Grid container spacing={3}>
+          {/* FILTRO POR ESTADO */}
           <Grid item xs={12} md={4}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Estado de la incidencia
+            </Typography>
             <FormControl fullWidth>
-              <InputLabel sx={{ color: 'white' }}>Estado</InputLabel>
               <Select
                 value={filtroEstado}
                 onChange={(e) => setFiltroEstado(e.target.value)}
-                label="Estado"
-                sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' } }}
+                displayEmpty
+                sx={{
+                  color: 'white',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                  '.MuiSvgIcon-root': { color: 'white' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4caf50' }
+                }}
+                MenuProps={{
+                  PaperProps: {
+                    sx: {
+                      bgcolor: '#1a1a1a',
+                      '& .MuiMenuItem-root': {
+                        color: 'white',
+                        '&:hover': {
+                          bgcolor: 'rgba(76, 175, 80, 0.2)'
+                        },
+                        '&.Mui-selected': {
+                          bgcolor: 'rgba(76, 175, 80, 0.3)',
+                          '&:hover': {
+                            bgcolor: 'rgba(76, 175, 80, 0.4)'
+                          }
+                        }
+                      }
+                    }
+                  }
+                }}
               >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="pendiente">Pendiente</MenuItem>
-                <MenuItem value="aprobado">Aprobado</MenuItem>
-                <MenuItem value="rechazado">Rechazado</MenuItem>
+                <MenuItem value="">Todas las incidencias</MenuItem>
+                <MenuItem value="pendiente">Pendientes</MenuItem>
+                <MenuItem value="aprobado">Aprobadas</MenuItem>
+                <MenuItem value="rechazado">Rechazadas</MenuItem>
               </Select>
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          {/* BÚSQUEDA POR TEXTO */}
+          <Grid item xs={12} md={5}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Buscar incidencia
+            </Typography>
             <TextField
               fullWidth
-              label="Buscar por tipo, descripción, RUT o nombre"
+              placeholder="Ingrese RUT, nombre del trabajador o descripción..."
               value={busquedaTexto}
               onChange={(e) => setBusquedaTexto(e.target.value)}
-              sx={{ 
-                input: { color: 'white' },
-                label: { color: 'white' },
-                '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' }
+              sx={{
+                '& .MuiInputBase-root': {
+                  color: 'white',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                },
+                '& .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.2)' 
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: 'rgba(255,255,255,0.3)' 
+                },
+                '& .Mui-focused .MuiOutlinedInput-notchedOutline': { 
+                  borderColor: '#4caf50' 
+                }
               }}
             />
           </Grid>
 
-          <Grid item xs={12} md={2}>
-            <Button
-              fullWidth
-              variant="outlined"
-              onClick={limpiarFiltros}
-              startIcon={<ClearIcon />}
-              sx={{ 
-                color: 'white', 
-                borderColor: 'white',
-                '&:hover': { borderColor: '#4caf50', color: '#4caf50' }
-              }}
-            >
-              Limpiar
-            </Button>
+          {/* BOTONES */}
+          <Grid item xs={12} md={3}>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontSize: '0.875rem' }}>
+              Acciones
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={cargarIncidencias}
+                sx={{ 
+                  bgcolor: '#2e7d32',
+                  height: '56px',
+                  fontWeight: 'bold',
+                  '&:hover': { bgcolor: '#1b5e20' }
+                }}
+              >
+                Aplicar
+              </Button>
+              {(filtroEstado || busquedaTexto) && (
+                <Button
+                  variant="outlined"
+                  onClick={limpiarFiltros}
+                  sx={{ 
+                    color: 'white',
+                    height: '56px',
+                    minWidth: '56px',
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    '&:hover': { 
+                      borderColor: '#f44336',
+                      bgcolor: 'rgba(244, 67, 54, 0.1)',
+                      color: '#f44336'
+                    }
+                  }}
+                  title="Limpiar filtros"
+                >
+                  <ClearIcon />
+                </Button>
+              )}
+            </Box>
           </Grid>
         </Grid>
 
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 2 }}>
-          Total de resultados: {incidencias.length}
-        </Typography>
+        {/* INFORMACIÓN DE RESULTADOS */}
+        <Box sx={{ 
+          mt: 3, 
+          pt: 3, 
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2
+        }}>
+          <Box>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: '500' }}>
+              Mostrando <strong style={{ color: '#4caf50' }}>{incidencias.length}</strong> de <strong>{incidencias.length}</strong> incidencias
+            </Typography>
+            {filtroEstado && (
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                Filtro aplicado: {filtroEstado}
+              </Typography>
+            )}
+          </Box>
+          
+          {(filtroEstado || busquedaTexto) && (
+            <Chip
+              label="Filtros activos"
+              onDelete={limpiarFiltros}
+              deleteIcon={<ClearIcon sx={{ color: 'white !important' }} />}
+              sx={{
+                bgcolor: 'rgba(76, 175, 80, 0.2)',
+                color: '#4caf50',
+                borderColor: '#4caf50',
+                border: '1px solid',
+                '& .MuiChip-deleteIcon:hover': {
+                  color: '#f44336 !important'
+                }
+              }}
+            />
+          )}
+        </Box>
       </Paper>
 
       {/* Tabla de Incidencias */}
@@ -262,7 +403,7 @@ const SupervisorIncidencias = () => {
                     {incidencia.trabajador?.nombre_completo || 'N/A'}
                     <br />
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                      RUT: {incidencia.trabajador?.rut}
+                      RUT: {incidencia.trabajador?.rut || 'N/A'}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ color: 'white', maxWidth: 200 }}>
@@ -283,7 +424,7 @@ const SupervisorIncidencias = () => {
                     />
                   </TableCell>
                   <TableCell sx={{ color: 'white' }}>
-                    {new Date(incidencia.fecha_creacion).toLocaleDateString()}
+                    {formatearFecha(incidencia.fecha_reporte)}
                   </TableCell>
                   <TableCell>
                     {incidencia.estado === 'pendiente' ? (
