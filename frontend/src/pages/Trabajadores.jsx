@@ -29,14 +29,13 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  QrCode2 as QrIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
-  QrCodeScanner as QrMasivoIcon,
-  Email as EmailIcon,
+  CloudUpload as CloudUploadIcon,
 } from '@mui/icons-material';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import ImportarTrabajadoresModal from '../components/ImportarTrabajadoresModal';
 
 export default function Trabajadores() {
   const [trabajadores, setTrabajadores] = useState([]);
@@ -48,6 +47,7 @@ export default function Trabajadores() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [trabajadorSeleccionado, setTrabajadorSeleccionado] = useState(null);
+  const [modalImportarOpen, setModalImportarOpen] = useState(false);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -72,10 +72,9 @@ export default function Trabajadores() {
     try {
       setLoading(true);
       const response = await api.get('/trabajadores/');
-      console.log('✅ Trabajadores cargados:', response.data.length);
       setTrabajadores(response.data);
     } catch (error) {
-      console.error('❌ Error cargando trabajadores:', error);
+      console.error('Error cargando trabajadores:', error);
       toast.error('Error cargando trabajadores');
     } finally {
       setLoading(false);
@@ -169,67 +168,6 @@ export default function Trabajadores() {
     }
   };
 
-  const generarQR = async (trabajador) => {
-    const loadingToast = toast.loading('Generando QR...');
-    
-    try {
-      // ✅ URL CORRECTA
-      const response = await api.post(`/trabajadores/${trabajador.id}/generar_qr/`);
-      console.log('✅ QR generado:', response.data);
-      
-      toast.success(`QR generado para ${trabajador.nombre}`, { id: loadingToast });
-      
-      // Esperar un momento y recargar
-      setTimeout(() => {
-        cargarTrabajadores();
-      }, 500);
-      
-    } catch (error) {
-      console.error('❌ Error generando QR:', error);
-      toast.error('Error al generar QR', { id: loadingToast });
-    }
-  };
-
-  // ✅ Generar QR Masivo - URL CORREGIDA
-  const generarQRMasivo = async () => {
-    const loadingToast = toast.loading('Generando QRs masivamente...');
-    
-    try {
-      // ✅ URL CORRECTA: /trabajadores/generar_qr_masivo/
-      const response = await api.post('/trabajadores/generar_qr_masivo/');
-      console.log('✅ Respuesta QR masivo:', response.data);
-      
-      toast.success(
-        `QRs generados: ${response.data.generados}${response.data.errores > 0 ? ` (${response.data.errores} errores)` : ''}`, 
-        { id: loadingToast }
-      );
-      
-      // Esperar un momento para que la BD se actualice
-      setTimeout(() => {
-        console.log('🔄 Recargando trabajadores...');
-        cargarTrabajadores();
-      }, 800);
-      
-    } catch (error) {
-      console.error('❌ Error generando QRs masivos:', error);
-      toast.error('Error al generar QRs masivos', { id: loadingToast });
-    }
-  };
-
-  // ✅ Enviar QR Masivo por email
-  const enviarQRMasivo = async () => {
-    const loadingToast = toast.loading('Enviando QRs por email...');
-    
-    try {
-      // ✅ URL CORRECTA
-      const response = await api.post('/trabajadores/enviar_qr_masivo/');
-      toast.success(response.data.message || 'QRs enviados correctamente', { id: loadingToast });
-    } catch (error) {
-      console.error('❌ Error enviando QRs masivos:', error);
-      toast.error('Error al enviar QRs masivos', { id: loadingToast });
-    }
-  };
-
   const limpiarFiltros = () => {
     setBusqueda('');
     setFiltroEstado('');
@@ -260,59 +198,44 @@ export default function Trabajadores() {
 
   return (
     <Box>
-      {/* Header con botón nuevo */}
+      {/* Header con botones */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" sx={{ color: 'white', fontWeight: 'bold' }}>
           Gestión de Trabajadores
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={abrirModalNuevo}
-          sx={{
-            bgcolor: '#2e7d32',
-            '&:hover': { bgcolor: '#1b5e20' },
-            fontWeight: 'bold',
-          }}
-        >
-          Nuevo Trabajador
-        </Button>
-      </Box>
-
-      {/* Acciones Masivas */}
-      <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
-        <Typography variant="h6" sx={{ color: 'white', mb: 2, fontWeight: 'bold' }}>
-          Acciones Masivas
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-          <Button
-            variant="contained"
-            startIcon={<QrMasivoIcon />}
-            onClick={generarQRMasivo}
-            sx={{
-              bgcolor: '#2e7d32',
-              '&:hover': { bgcolor: '#1b5e20' },
-            }}
-          >
-            Generar QR Masivo
-          </Button>
+        
+        {/* Botones de acción */}
+        <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="outlined"
-            startIcon={<EmailIcon />}
-            onClick={enviarQRMasivo}
+            startIcon={<CloudUploadIcon />}
+            onClick={() => setModalImportarOpen(true)}
             sx={{
-              color: 'white',
-              borderColor: 'rgba(255,255,255,0.3)',
+              color: '#4caf50',
+              borderColor: '#4caf50',
               '&:hover': {
-                borderColor: '#4caf50',
+                borderColor: '#66bb6a',
                 bgcolor: 'rgba(76, 175, 80, 0.1)',
               },
             }}
           >
-            Enviar QR Masivo
+            Importar Trabajadores
+          </Button>
+          
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={abrirModalNuevo}
+            sx={{
+              bgcolor: '#2e7d32',
+              '&:hover': { bgcolor: '#1b5e20' },
+              fontWeight: 'bold',
+            }}
+          >
+            Nuevo Trabajador
           </Button>
         </Box>
-      </Paper>
+      </Box>
 
       {/* Filtros */}
       <Paper sx={{ p: 4, mb: 4, bgcolor: '#102010', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -406,7 +329,7 @@ export default function Trabajadores() {
               <Button
                 fullWidth
                 variant="contained"
-                onClick={() => {}} // Los filtros ya se aplican automáticamente
+                onClick={() => {}}
                 sx={{ 
                   bgcolor: '#2e7d32',
                   height: '56px',
@@ -499,7 +422,6 @@ export default function Trabajadores() {
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cargo</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo Contrato</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado QR</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -530,14 +452,6 @@ export default function Trabajadores() {
                     />
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={trabajador.qr_generado ? 'QR Generado' : 'No Generado'}
-                      color={trabajador.qr_generado ? 'success' : 'default'}
-                      size="small"
-                      variant={trabajador.qr_generado ? 'filled' : 'outlined'}
-                    />
-                  </TableCell>
-                  <TableCell>
                     <IconButton
                       size="small"
                       onClick={() => abrirModalEditar(trabajador)}
@@ -545,14 +459,6 @@ export default function Trabajadores() {
                       title="Editar"
                     >
                       <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => generarQR(trabajador)}
-                      sx={{ color: '#10b981' }}
-                      title="Generar QR"
-                    >
-                      <QrIcon />
                     </IconButton>
                     <IconButton
                       size="small"
@@ -695,21 +601,44 @@ export default function Trabajadores() {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  label="Departamento"
-                  name="departamento"
-                  value={formData.departamento}
-                  onChange={handleChange}
-                  sx={{
-                    '& .MuiInputBase-root': { color: 'white' },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                  }}
-                />
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Departamento</InputLabel>
+                  <Select
+                    name="departamento"
+                    value={formData.departamento}
+                    onChange={handleChange}
+                    label="Departamento"
+                    sx={{
+                      color: 'white',
+                      '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '.MuiSvgIcon-root': { color: 'white' },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#1a1a1a',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(76, 175, 80, 0.2)' }
+                          }
+                        }
+                      }
+                    }}
+                  >
+                    <MenuItem value="">Sin departamento</MenuItem>
+                    <MenuItem value="produccion">Producción</MenuItem>
+                    <MenuItem value="logistica">Logística</MenuItem>
+                    <MenuItem value="calidad">Calidad</MenuItem>
+                    <MenuItem value="mantenimiento">Mantenimiento</MenuItem>
+                    <MenuItem value="administracion">Administración</MenuItem>
+                    <MenuItem value="rrhh">Recursos Humanos</MenuItem>
+                    <MenuItem value="operaciones">Operaciones</MenuItem>
+                    <MenuItem value="bodega">Bodega</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12} md={4}>
                 <FormControl fullWidth>
                   <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Tipo Contrato</InputLabel>
                   <Select
@@ -722,6 +651,17 @@ export default function Trabajadores() {
                       '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
                       '.MuiSvgIcon-root': { color: 'white' },
                     }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#1a1a1a',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(76, 175, 80, 0.2)' }
+                          }
+                        }
+                      }
+                    }}
                   >
                     <MenuItem value="indefinido">Indefinido</MenuItem>
                     <MenuItem value="plazo_fijo">Plazo Fijo</MenuItem>
@@ -729,7 +669,7 @@ export default function Trabajadores() {
                 </FormControl>
               </Grid>
 
-              <Grid item xs={12} md={6}>
+              <Grid item xs={12} md={8}>
                 <FormControl fullWidth>
                   <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sede</InputLabel>
                   <Select
@@ -741,6 +681,17 @@ export default function Trabajadores() {
                       color: 'white',
                       '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
                       '.MuiSvgIcon-root': { color: 'white' },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#1a1a1a',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            '&:hover': { bgcolor: 'rgba(76, 175, 80, 0.2)' }
+                          }
+                        }
+                      }
                     }}
                   >
                     <MenuItem value="casablanca">Casablanca</MenuItem>
@@ -768,6 +719,13 @@ export default function Trabajadores() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal Importar Trabajadores */}
+      <ImportarTrabajadoresModal
+        open={modalImportarOpen}
+        onClose={() => setModalImportarOpen(false)}
+        onSuccess={cargarTrabajadores}
+      />
     </Box>
   );
 }

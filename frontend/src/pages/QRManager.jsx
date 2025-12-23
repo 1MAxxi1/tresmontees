@@ -50,7 +50,8 @@ export default function QRManager() {
 
   const generarQR = async (id) => {
     try {
-      await api.post(`/qr/generar/${id}/`);
+      // ✅ URL CORRECTA
+      await api.post(`/trabajadores/${id}/generar_qr/`);
       toast.success("QR generado exitosamente");
       cargarTrabajadores();
     } catch (err) {
@@ -93,7 +94,8 @@ export default function QRManager() {
 
   const generarMasivo = async () => {
     try {
-      await api.post("/qr/generar-masivo/");
+      // ✅ URL CORRECTA
+      await api.post("/trabajadores/generar_qr_masivo/");
       toast.success("QR generados masivamente");
       cargarTrabajadores();
     } catch (err) {
@@ -104,7 +106,8 @@ export default function QRManager() {
 
   const enviarMasivo = async () => {
     try {
-      await api.post("/qr/enviar-masivo/");
+      // ✅ URL CORRECTA
+      await api.post("/trabajadores/enviar_qr_masivo/");
       toast.success("QR enviados masivamente por email");
       cargarTrabajadores();
     } catch (err) {
@@ -115,7 +118,7 @@ export default function QRManager() {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
+      <Typography variant="h4" gutterBottom sx={{ color: 'white', fontWeight: 'bold', mb: 3 }}>
         <QrCodeIcon sx={{ mr: 2, verticalAlign: 'middle' }} />
         Gestión de Códigos QR
       </Typography>
@@ -124,43 +127,53 @@ export default function QRManager() {
         Módulo de generación y gestión de códigos QR para trabajadores
       </Alert>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper sx={{ p: 3, mb: 3, bgcolor: '#102010' }}>
+        <Typography variant="h6" gutterBottom sx={{ color: 'white' }}>
           Acciones Masivas
         </Typography>
         
         <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
           <Button
             variant="contained"
-            color="primary"
             startIcon={<QrCodeIcon />}
             onClick={generarMasivo}
             size="large"
+            sx={{
+              bgcolor: '#2e7d32',
+              '&:hover': { bgcolor: '#1b5e20' }
+            }}
           >
             Generar QR Masivo
           </Button>
 
           <Button
-            variant="contained"
-            color="secondary"
+            variant="outlined"
             startIcon={<EmailIcon />}
             onClick={enviarMasivo}
             size="large"
+            sx={{
+              color: 'white',
+              borderColor: 'rgba(255,255,255,0.3)',
+              '&:hover': {
+                borderColor: '#4caf50',
+                bgcolor: 'rgba(76, 175, 80, 0.1)',
+              }
+            }}
           >
             Enviar QR Masivo
           </Button>
         </Box>
       </Paper>
 
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+      <Paper sx={{ p: 3, bgcolor: '#102010' }}>
+        <Typography variant="h6" gutterBottom sx={{ mb: 2, color: 'white' }}>
           Lista de Trabajadores
         </Typography>
 
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: 'primary.main' }}>
+              <TableRow sx={{ bgcolor: '#09320f' }}>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Trabajador</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>RUT</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado QR</TableCell>
@@ -177,7 +190,7 @@ export default function QRManager() {
               ) : trabajadores.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                    <Typography color="textSecondary">
+                    <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>
                       No hay trabajadores registrados
                     </Typography>
                   </TableCell>
@@ -186,28 +199,26 @@ export default function QRManager() {
                 trabajadores.map((t) => (
                   <TableRow 
                     key={t.id}
-                    sx={{ '&:hover': { bgcolor: 'action.hover' } }}
+                    sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}
                   >
-                    <TableCell>
+                    <TableCell sx={{ color: 'white' }}>
                       {t.nombre} {t.apellido_paterno} {t.apellido_materno}
                     </TableCell>
-                    <TableCell>{t.rut}</TableCell>
+                    <TableCell sx={{ color: 'white' }}>{t.rut}</TableCell>
                     <TableCell>
+                      {/* ✅ CORREGIDO: Usar qr_generado en lugar de qr_estado */}
                       <Chip 
-                        label={t.qr_estado || "NO GENERADO"}
-                        color={
-                          t.qr_estado === "ENVIADO" ? "success" :
-                          t.qr_estado === "GENERADO" ? "primary" :
-                          "default"
-                        }
+                        label={t.qr_generado ? "QR Generado" : "No Generado"}
+                        color={t.qr_generado ? "success" : "default"}
                         size="small"
+                        variant={t.qr_generado ? "filled" : "outlined"}
                       />
                     </TableCell>
 
                     <TableCell>
                       <IconButton
                         onClick={() => generarQR(t.id)}
-                        color="primary"
+                        sx={{ color: '#10b981' }}
                         title="Generar QR"
                       >
                         <AutoModeIcon />
@@ -215,16 +226,18 @@ export default function QRManager() {
 
                       <IconButton
                         onClick={() => descargarQR(t.id)}
-                        color="success"
+                        sx={{ color: '#3b82f6' }}
                         title="Descargar QR"
+                        disabled={!t.qr_generado}
                       >
                         <DownloadIcon />
                       </IconButton>
 
                       <IconButton
                         onClick={() => enviarQR(t.id)}
-                        color="secondary"
+                        sx={{ color: '#8b5cf6' }}
                         title="Enviar por Email"
+                        disabled={!t.qr_generado}
                       >
                         <EmailIcon />
                       </IconButton>
@@ -237,39 +250,34 @@ export default function QRManager() {
         </TableContainer>
       </Paper>
 
-      <Paper sx={{ p: 3, mt: 3 }}>
-        <Typography variant="h6" gutterBottom>
+      <Paper sx={{ p: 3, mt: 3, bgcolor: '#102010' }}>
+        <Typography variant="h6" gutterBottom sx={{ color: 'white' }}>
           Funcionalidades
         </Typography>
         <Box component="ul" sx={{ pl: 2 }}>
           <li>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               <strong>Generar QR Individual:</strong> Genera un código QR único para un trabajador
             </Typography>
           </li>
           <li>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               <strong>Generar QR Masivo:</strong> Genera códigos QR para todos los trabajadores
             </Typography>
           </li>
           <li>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               <strong>Descargar QR:</strong> Descarga la imagen del código QR
             </Typography>
           </li>
           <li>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               <strong>Enviar por Email:</strong> Envía el código QR al correo del trabajador
             </Typography>
           </li>
           <li>
-            <Typography variant="body2">
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
               <strong>Enviar Masivo:</strong> Envía códigos QR a todos los trabajadores por email
-            </Typography>
-          </li>
-          <li>
-            <Typography variant="body2">
-              <strong>Estados:</strong> No generado, Generado, Enviado
             </Typography>
           </li>
         </Box>
